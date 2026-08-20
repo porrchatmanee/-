@@ -1,0 +1,2 @@
+sed -i 's/<div>\n *<div className="font-bold text-slate-700 text-sm leading-snug">{item.name}<\/div>/<div className="flex-1 min-w-0">\n                        <div className="font-bold text-slate-700 text-sm leading-snug truncate" title={item.name}>{item.name}<\/div>/g' src/pages/CategoryView.tsx
+sed -i 's/<div className="text-amber-650 font-extrabold text-sm whitespace-nowrap">/<div className="text-amber-650 font-extrabold text-sm whitespace-nowrap shrink-0">/g' src/pages/CategoryView.tsx

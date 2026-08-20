@@ -1,0 +1,6 @@
+{
+  "name": "SUKJAI Hub",
+  "description": "Ward Inventory management system with camera barcode scanning capabilities",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
