@@ -33,7 +33,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
   const [newUnit, setNewUnit] = useState('กล่อง');
   const [newExpiry, setNewExpiry] = useState('');
   const [addError, setAddError] = useState('');
-  const [isAddNumericOnly, setIsAddNumericOnly] = useState<boolean>(true);
+  const [isAddNumericOnly, setIsAddNumericOnly] = useState<boolean>(false);
   
   const addItemBarcodeRef = React.useRef<HTMLInputElement>(null);
   const newItemNameRef = React.useRef<HTMLInputElement>(null);
@@ -1307,11 +1307,17 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                     <input 
                       type="checkbox" 
                       checked={isAddNumericOnly}
-                      onChange={(e) => setIsAddNumericOnly(e.target.checked)}
+                      onChange={(e) => {
+                        const newMode = e.target.checked;
+                        setIsAddNumericOnly(newMode);
+                        if (newId) {
+                          setNewId((window as any).normalizeBarcode(newId, newMode));
+                        }
+                      }}
                       className="w-3.5 h-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
                     />
-                    <span className="text-[10px] font-bold text-slate-500 group-hover:text-rose-600 transition-colors">
-                      กรองเฉพาะตัวเลขเท่านั้น (Numeric Only)
+                    <span className={`text-[10px] font-bold transition-colors ${isAddNumericOnly ? 'text-rose-600' : 'text-slate-500 group-hover:text-rose-600'}`}>
+                      {isAddNumericOnly ? '📍 โหมด: กรองเฉพาะตัวเลขเท่านั้น' : '🔓 โหมด: รองรับตัวอักษรและตัวเลข (แนะนำ)'}
                     </span>
                   </label>
                 </div>

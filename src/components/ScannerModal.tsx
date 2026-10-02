@@ -43,10 +43,13 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
   const [regName, setRegName] = useState('');
   const [regCategory, setRegCategory] = useState<CategoryId>('medical');
   const [regUnit, setRegUnit] = useState('กล่อง');
-  const [isNumericOnly, setIsNumericOnly] = useState<boolean>(true);
+  const [isNumericOnly, setIsNumericOnly] = useState<boolean>(false);
   const [regQty, setRegQty] = useState<number>(10);
   const [regExpiry, setRegExpiry] = useState('');
   const [regError, setRegError] = useState('');
+
+  // Local state for the raw input field to ensure smooth typing/scanning
+  const [rawInputValue, setRawInputValue] = useState('');
 
   // Focus ref for physical USB barcode reader gun
   const barcodeInputRef = useRef<HTMLInputElement>(null);
@@ -906,14 +909,22 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
               <input
                 ref={barcodeInputRef}
                 type="text"
+                value={rawInputValue}
                 onChange={(e) => {
                   const val = e.target.value;
-                  // REAL-TIME VISUAL FEEDBACK (Optional: can keep it raw or normalize here too)
-                  // For the main input, we normalize on Enter or Scan.
-                  // But let's normalize in real-time for better UX
-                  e.target.value = (window as any).normalizeBarcode(val, isNumericOnly);
+                  // Normalize in real-time
+                  const normalized = (window as any).normalizeBarcode(val, isNumericOnly);
+                  setRawInputValue(normalized);
                 }}
-                onKeyDown={handleInputKeyDown}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (rawInputValue) {
+                      handleBarcodeScanned(rawInputValue);
+                      setRawInputValue(''); // Clear after processing
+                    }
+                  }
+                }}
                 placeholder="[ สแกนบาร์โค้ดที่นี่ ]"
                 className="w-full text-center bg-white border border-indigo-150 rounded-2xl px-4 py-6 text-base md:text-lg tracking-widest text-slate-800 placeholder-indigo-300 font-extrabold focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 shadow-sm"
               />
@@ -929,11 +940,18 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
                 <input 
                   type="checkbox" 
                   checked={isNumericOnly}
-                  onChange={(e) => setIsNumericOnly(e.target.checked)}
+                  onChange={(e) => {
+                    const newMode = e.target.checked;
+                    setIsNumericOnly(newMode);
+                    // Re-normalize current input if mode changed
+                    if (rawInputValue) {
+                      setRawInputValue((window as any).normalizeBarcode(rawInputValue, newMode));
+                    }
+                  }}
                   className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                 />
-                <span className="text-[10px] font-bold text-slate-500 group-hover:text-indigo-600 transition-colors">
-                  กรองเฉพาะตัวเลขเท่านั้น (Numeric Only)
+                <span className={`text-[10px] font-bold transition-colors ${isNumericOnly ? 'text-indigo-600' : 'text-slate-500 group-hover:text-indigo-600'}`}>
+                  {isNumericOnly ? '📍 โหมด: กรองเฉพาะตัวเลขเท่านั้น' : '🔓 โหมด: รองรับตัวอักษรและตัวเลข (แนะนำ)'}
                 </span>
               </label>
             </div>
