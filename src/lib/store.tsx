@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { AppState, InventoryItem, Transaction } from '../types';
+import { AppState, InventoryItem, Transaction, ItemLot } from '../types';
 import { INITIAL_ITEMS } from './constants';
 import { supabase, isSupabaseConfigured, getMaskedUrl, getMaskedKey } from './supabase';
+import { computeItemLots, getEarliestLotExpiry, formatOperatorWithLot, parseLotFromOperator, generateLotNumber } from './lots';
 
 interface InventoryContextType extends AppState {
-  processTransaction: (tx: Omit<Transaction, 'id' | 'timestamp'> & { operator?: string }) => Promise<void>;
+  processTransaction: (tx: Omit<Transaction, 'id' | 'timestamp'> & { operator?: string; lotNumber?: string }) => Promise<void>;
   updateItem: (id: string, updates: Partial<InventoryItem>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   addItem: (item: InventoryItem) => Promise<void>;
@@ -20,14 +21,40 @@ interface InventoryContextType extends AppState {
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
-const mapDbItemToLocal = (dbItem: any): InventoryItem => ({
-  id: dbItem.id,
-  name: dbItem.name,
-  categoryId: dbItem.category_id,
-  quantity: dbItem.quantity,
-  unit: dbItem.unit,
-  expiryDate: dbItem.expiry_date || undefined,
-});
+const getStoredLimits = (): Record<string, { minStock?: number; maxStock?: number }> => {
+  try {
+    const saved = localStorage.getItem('sukjai_item_stock_limits_v1');
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveStoredLimit = (itemId: string, minStock?: number, maxStock?: number) => {
+  try {
+    const current = getStoredLimits();
+    current[itemId] = {
+      minStock: minStock !== undefined ? minStock : (current[itemId]?.minStock ?? 10),
+      maxStock: maxStock !== undefined ? maxStock : (current[itemId]?.maxStock ?? 100),
+    };
+    localStorage.setItem('sukjai_item_stock_limits_v1', JSON.stringify(current));
+  } catch {}
+};
+
+const mapDbItemToLocal = (dbItem: any): InventoryItem => {
+  const limits = getStoredLimits();
+  const itemLimit = limits[dbItem.id] || {};
+  return {
+    id: dbItem.id,
+    name: dbItem.name,
+    categoryId: dbItem.category_id,
+    quantity: dbItem.quantity,
+    unit: dbItem.unit,
+    expiryDate: dbItem.expiry_date || undefined,
+    minStock: dbItem.min_stock !== undefined && dbItem.min_stock !== null ? Number(dbItem.min_stock) : (itemLimit.minStock ?? 10),
+    maxStock: dbItem.max_stock !== undefined && dbItem.max_stock !== null ? Number(dbItem.max_stock) : (itemLimit.maxStock ?? 100),
+  };
+};
 
 const mapDbTxToLocal = (dbTx: any): Transaction => ({
   id: dbTx.id,
@@ -35,7 +62,8 @@ const mapDbTxToLocal = (dbTx: any): Transaction => ({
   type: dbTx.type,
   quantity: dbTx.quantity,
   expiryDate: dbTx.expiry_date || undefined,
-  operator: dbTx.operator || 'พยาบาล',
+  lotNumber: parseLotFromOperator(dbTx.operator) || (dbTx.expiry_date ? generateLotNumber(dbTx.expiry_date, dbTx.created_at) : undefined),
+  operator: dbTx.operator ? dbTx.operator.replace(/\s*\[Lot:[^\]]+\]/gi, '').trim() : 'พยาบาล',
   timestamp: dbTx.created_at || new Date().toISOString(),
 });
 
@@ -85,8 +113,19 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
 
       if (txsErr) throw txsErr;
 
-      const mappedItems: InventoryItem[] = (dbItems || []).map(mapDbItemToLocal);
+      const rawItems: InventoryItem[] = (dbItems || []).map(mapDbItemToLocal);
       const mappedTxs: Transaction[] = (dbTxs || []).map(mapDbTxToLocal);
+
+      // Enrich items with computed lots and earliest FEFO expiryDate
+      const mappedItems: InventoryItem[] = rawItems.map(item => {
+        const lots = computeItemLots(item, mappedTxs);
+        const earliestExp = getEarliestLotExpiry(lots);
+        return {
+          ...item,
+          lots,
+          expiryDate: earliestExp || item.expiryDate
+        };
+      });
 
       setState({
         items: mappedItems,
@@ -138,11 +177,13 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     let safeType: 'RECEIVE' | 'ISSUE' = (rawType === 'RECEIVE' || rawType === 'IN') ? 'RECEIVE' : 'ISSUE';
 
     const now = new Date().toISOString();
+    const effectiveLot = txArgs.lotNumber || (txArgs.expiryDate ? generateLotNumber(txArgs.expiryDate, now) : undefined);
     const newTxLocal: Transaction = {
       ...txArgs,
       type: safeType,
       id: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       timestamp: now,
+      lotNumber: effectiveLot,
       operator: txArgs.operator || 'พยาบาล'
     };
 
@@ -155,7 +196,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         type: safeType,
         quantity: Number(txArgs.quantity),
         expiry_date: txArgs.expiryDate || null,
-        operator: String(txArgs.operator || 'พยาบาล'),
+        operator: formatOperatorWithLot(txArgs.operator || 'พยาบาล', effectiveLot),
       };
 
       try {
@@ -176,6 +217,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       setState(prev => {
         const items = [...prev.items];
         const itemIndex = items.findIndex(i => i.id === txArgs.itemId);
+        const updatedTxs = [newTxLocal, ...prev.transactions];
         
         if (itemIndex >= 0) {
           const currentItem = items[itemIndex];
@@ -183,26 +225,37 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
             ? currentItem.quantity + txArgs.quantity
             : Math.max(0, currentItem.quantity - txArgs.quantity);
             
-          items[itemIndex] = {
+          const tempItem: InventoryItem = {
             ...currentItem,
             quantity: newQuantity,
-            expiryDate: txArgs.type === 'RECEIVE' && txArgs.expiryDate ? txArgs.expiryDate : currentItem.expiryDate
+          };
+          const lots = computeItemLots(tempItem, updatedTxs);
+          const earliestExp = getEarliestLotExpiry(lots);
+
+          items[itemIndex] = {
+            ...tempItem,
+            lots,
+            expiryDate: earliestExp || currentItem.expiryDate
           };
         } else if (txArgs.type === 'RECEIVE') {
-          items.push({
+          const newItem: InventoryItem = {
             id: txArgs.itemId,
             name: `Unknown Item (${txArgs.itemId})`,
             categoryId: 'medical',
             quantity: txArgs.quantity,
             unit: 'ชิ้น',
             expiryDate: txArgs.expiryDate
-          });
+          };
+          const lots = computeItemLots(newItem, updatedTxs);
+          newItem.lots = lots;
+          newItem.expiryDate = getEarliestLotExpiry(lots) || txArgs.expiryDate;
+          items.push(newItem);
         }
 
         return {
           ...prev,
           items,
-          transactions: [newTxLocal, ...prev.transactions],
+          transactions: updatedTxs,
           lastUpdated: now
         };
       });
@@ -210,6 +263,10 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateItem = async (id: string, updates: Partial<InventoryItem>) => {
+    if (updates.minStock !== undefined || updates.maxStock !== undefined) {
+      saveStoredLimit(id, updates.minStock, updates.maxStock);
+    }
+
     if (isSupabaseConfigured && supabase) {
       setIsSyncing(true);
       setDbError(null);
@@ -273,6 +330,10 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   };
   
   const addItem = async (item: InventoryItem) => {
+    if (item.minStock !== undefined || item.maxStock !== undefined) {
+      saveStoredLimit(item.id, item.minStock, item.maxStock);
+    }
+
     if (isSupabaseConfigured && supabase) {
       setIsSyncing(true);
       setDbError(null);

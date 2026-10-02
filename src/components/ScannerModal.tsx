@@ -2,13 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Scan, ArrowDownToLine, ArrowUpFromLine, Calendar, Info, 
   Camera, RotateCw, PlusCircle, CheckCircle, Package, HelpCircle, 
-  Plus, Layers, ListFilter, ScanLine, Zap, AlertTriangle, Sparkles
+  Plus, Layers, ListFilter, ScanLine, Zap, AlertTriangle, Sparkles,
+  Tag, Clock, ArrowDownLeft, ArrowUpRight, ChevronRight
 } from 'lucide-react';
 import { useInventory } from '../lib/store';
 import { CATEGORIES } from '../lib/constants';
 import { CategoryId, InventoryItem } from '../types';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { normalizeBarcode, containsThai, extractBarcodeDigits } from '../lib/barcode';
+import { formatThaiDate, generateLotNumber } from '../lib/lots';
 
 interface ScannerModalProps {
   isOpen: boolean;
@@ -23,6 +25,7 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
   const [scannedCode, setScannedCode] = useState('');
   const [quantity, setQuantity] = useState<number>(1);
   const [expiryDate, setExpiryDate] = useState('');
+  const [scanLotNumber, setScanLotNumber] = useState('');
   const [operator, setOperator] = useState<string>('พยาบาล');
   const [selectedItemId, setSelectedItemId] = useState<string>('');
   const [error, setError] = useState('');
@@ -430,6 +433,7 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
       type: mode,
       quantity,
       expiryDate: expiryDate || undefined,
+      lotNumber: scanLotNumber.trim() || undefined,
       operator: operator || 'พยาบาล'
     });
 
@@ -439,6 +443,8 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
     setScannedCode('');
     setSelectedItemId('');
     setQuantity(1);
+    setScanLotNumber('');
+    setExpiryDate('');
     setIsRegistering(false);
     
     // Refocus raw input box automatically
@@ -1183,21 +1189,146 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
               </select>
             </div>
 
-            {/* Active matching product brief preview */}
-            {scannedCode && matchedItem && (
-              <div className="p-3 bg-indigo-50/50 text-indigo-700 rounded-2xl border border-indigo-100/60 flex items-center justify-between text-xs animate-fade-in font-bold">
-                <span className="flex items-center gap-1.5">
-                  <Package size={14} className="text-indigo-500" />
-                  <span>สแกนบาร์โค้ดแล้ว: <span className="font-mono text-indigo-700">{scannedCode}</span> ({matchedItem.name})</span>
-                </span>
-                <span className="bg-white/80 border border-indigo-100 px-2 py-0.5 rounded-lg font-mono">คลังเดิม: {matchedItem.quantity} {matchedItem.unit}</span>
+            {/* Active matching product rich preview with Stock Quantity & Multi-Lot Details */}
+            {matchedItem && (
+              <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 space-y-3 animate-fade-in shadow-xs">
+                {/* Header: Item Identity & Stock Status */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/70 pb-3">
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      {CATEGORIES.find(c => c.id === matchedItem.categoryId)?.name || 'เวชภัณฑ์'} • รหัส {matchedItem.id}
+                    </span>
+                    <h4 className="text-base font-black text-slate-800 truncate" title={matchedItem.name}>
+                      {matchedItem.name}
+                    </h4>
+                  </div>
+
+                  {/* Stock Quantity Badge - Prominent */}
+                  <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                    <div className="bg-white border border-slate-200 px-3.5 py-1.5 rounded-xl shadow-xs text-right">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold text-slate-400 block leading-tight">คงเหลือปัจจุบัน</span>
+                        <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                          เกณฑ์ {matchedItem.minStock ?? 10} - {matchedItem.maxStock ?? 100}
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-1 justify-end mt-0.5">
+                        <span className={`text-xl font-black ${
+                          matchedItem.quantity === 0 ? 'text-rose-600' :
+                          matchedItem.quantity <= (matchedItem.minStock ?? 10) ? 'text-amber-600' : 
+                          matchedItem.quantity > (matchedItem.maxStock ?? 100) ? 'text-sky-600' : 'text-emerald-600'
+                        }`}>
+                          {matchedItem.quantity}
+                        </span>
+                        <span className="text-xs font-bold text-slate-500">{matchedItem.unit}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Real-time Math Preview */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs px-3 py-2 bg-white rounded-xl border border-slate-200/70">
+                  <span className="font-bold text-slate-600">คำนวณยอดหลังทำรายการ:</span>
+                  <div className="flex items-center gap-1.5 font-mono font-bold">
+                    <span className="text-slate-500">{matchedItem.quantity}</span>
+                    <span className={mode === 'RECEIVE' ? 'text-emerald-600' : 'text-rose-600'}>
+                      {mode === 'RECEIVE' ? '+' : '-'} {quantity}
+                    </span>
+                    <span className="text-slate-400">=</span>
+                    {(() => {
+                      const newTotal = mode === 'RECEIVE' ? matchedItem.quantity + quantity : Math.max(0, matchedItem.quantity - quantity);
+                      const min = matchedItem.minStock ?? 10;
+                      const max = matchedItem.maxStock ?? 100;
+                      let badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                      let statusNote = '';
+                      if (newTotal === 0) {
+                        badgeClass = 'bg-rose-100 text-rose-700 border-rose-300';
+                        statusNote = '(หมด)';
+                      } else if (newTotal <= min) {
+                        badgeClass = 'bg-amber-100 text-amber-800 border-amber-300';
+                        statusNote = '(สต็อกต่ำ ≤ Min)';
+                      } else if (newTotal > max) {
+                        badgeClass = 'bg-sky-100 text-sky-800 border-sky-300';
+                        statusNote = '(สต็อกเกิน > Max)';
+                      }
+                      return (
+                        <div className="flex items-center gap-1.5">
+                          <span className={`px-2 py-0.5 rounded-md font-black border ${badgeClass}`}>
+                            {newTotal} {matchedItem.unit}
+                          </span>
+                          {statusNote && (
+                            <span className="text-[10px] font-sans font-bold text-slate-500">{statusNote}</span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Multi-Lot Breakdown & Expiry Dates */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <Tag size={12} className="text-indigo-500" />
+                      <span>วันหมดอายุและล็อตในคลัง ({matchedItem.lots?.length || (matchedItem.expiryDate ? 1 : 0)} ล็อต):</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400">ระบบ FEFO (หมดอายุก่อน จ่ายก่อน)</span>
+                  </div>
+
+                  <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
+                    {matchedItem.lots && matchedItem.lots.length > 0 ? (
+                      matchedItem.lots.map((lot, idx) => {
+                        const isFirst = idx === 0;
+                        return (
+                          <div 
+                            key={`${lot.lotNumber}_${lot.expiryDate}_${idx}`}
+                            className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs border ${
+                              isFirst 
+                                ? 'bg-rose-50/60 border-rose-200 text-rose-900 font-bold' 
+                                : 'bg-white border-slate-200/70 text-slate-700 font-medium'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[11px] bg-white/80 px-1.5 py-0.5 rounded border border-slate-200 font-bold">
+                                {lot.lotNumber}
+                              </span>
+                              <span>หมดอายุ: <strong>{formatThaiDate(lot.expiryDate)}</strong></span>
+                              {isFirst && (
+                                <span className="text-[9px] bg-rose-200/60 text-rose-700 px-1.5 py-0.2 rounded font-black">
+                                  🔴 หมดอายุก่อน
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-mono font-bold">
+                              {lot.quantity} {matchedItem.unit}
+                            </span>
+                          </div>
+                        );
+                      })
+                    ) : matchedItem.expiryDate ? (
+                      <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs bg-white border border-slate-200 text-slate-700 font-medium">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded">LOT-ตั้งต้น</span>
+                          <span>หมดอายุ: <strong>{formatThaiDate(matchedItem.expiryDate)}</strong></span>
+                        </div>
+                        <span className="font-mono font-bold">{matchedItem.quantity} {matchedItem.unit}</span>
+                      </div>
+                    ) : (
+                      <div className="text-center py-2 text-[11px] text-slate-400 bg-white rounded-lg border border-dashed border-slate-200">
+                        ยังไม่มีการระบุล็อตและวันหมดอายุ (สามารถระบุด้านล่างได้)
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
             {/* 3.จำนวน / ผู้ทำรายการ Column Grid */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-450 block uppercase tracking-wider">จำนวน</label>
+                <label className="text-xs font-bold text-slate-500 block uppercase tracking-wider">
+                  จำนวน ({mode === 'RECEIVE' ? 'รับเข้า' : 'เบิกออก'})
+                </label>
                 <div className="flex items-center bg-slate-50/75 border border-slate-200 rounded-2xl px-2 h-12 shadow-inner">
                   <button
                     type="button"
@@ -1226,7 +1357,7 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-450 block uppercase tracking-wider">ผู้ทำรายการ</label>
+                <label className="text-xs font-bold text-slate-500 block uppercase tracking-wider">ผู้ทำรายการ</label>
                 <input
                   type="text"
                   required
@@ -1238,29 +1369,106 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
               </div>
             </div>
 
-            {/* 4.Expiry update (อัปเดตวันหมดอายุล็อตใหม่) */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-450 block flex items-center gap-1 justify-between uppercase tracking-wider">
-                <span>อัปเดตวันหมดอายุ (ถ้ามี)</span>
-                {expiryDate && (
-                  <button 
-                    type="button"
-                    onClick={() => setExpiryDate('')}
-                    className="text-[10px] text-slate-400 hover:text-slate-600 font-bold transition-colors"
-                  >
-                    ล้างวันหมดอายุ
-                  </button>
-                )}
-              </label>
-              <div className="relative">
-                <input
-                  type="date"
-                  value={expiryDate}
-                  onChange={(e) => setExpiryDate(e.target.value)}
-                  className="w-full bg-slate-50/75 border border-slate-200 px-4 py-3 rounded-2xl text-slate-700 text-xs md:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 shadow-inner h-12 transition-all cursor-pointer"
-                />
+            {/* 4. Multi-Lot & Expiry Management: RECEIVE vs ISSUE */}
+            {mode === 'RECEIVE' ? (
+              <div className="bg-emerald-50/50 border border-emerald-200/80 rounded-2xl p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-emerald-800 flex items-center gap-1.5">
+                    <Tag size={13} className="text-emerald-600" />
+                    <span>ข้อมูลล็อตที่รับเข้า (Lot & Expiry)</span>
+                  </span>
+                  <span className="text-[10px] text-emerald-600 font-bold bg-emerald-100/70 px-2 py-0.5 rounded-full">
+                    รองรับวันหมดอายุหลายล็อต
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                      <span>หมายเลขล็อต (Lot No.)</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const autoLot = generateLotNumber(expiryDate);
+                          setScanLotNumber(autoLot);
+                        }}
+                        className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold cursor-pointer"
+                      >
+                        ⚡ สร้างเลขอัตโนมัติ
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="เช่น LOT-6702, B2408 (เว้นว่างได้)"
+                      value={scanLotNumber}
+                      onChange={(e) => setScanLotNumber(e.target.value)}
+                      className="w-full bg-white border border-emerald-200 px-3.5 py-2.5 rounded-xl text-slate-800 font-mono text-xs font-bold focus:ring-2 focus:ring-emerald-200 outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                      <span>วันหมดอายุของล็อตนี้</span>
+                      {expiryDate && (
+                        <button
+                          type="button"
+                          onClick={() => setExpiryDate('')}
+                          className="text-[10px] text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          ล้างค่า
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="date"
+                      value={expiryDate}
+                      onChange={(e) => setExpiryDate(e.target.value)}
+                      className="w-full bg-white border border-emerald-200 px-3.5 py-2 rounded-xl text-slate-800 text-xs font-bold focus:ring-2 focus:ring-emerald-200 outline-none cursor-pointer h-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-2 bg-white/80 rounded-xl border border-emerald-200/60 text-[10px] text-emerald-800 leading-relaxed">
+                  💡 <strong>กรณีวันหมดอายุแต่ละล็อตไม่เท่ากัน:</strong> กรอกวันหมดอายุและเลขล็อตของงวดนี้ได้เลย ระบบจะบันทึกแยกเก็บเป็นล็อตใหม่ให้อัตโนมัติ และคำนวณยอดสต็อกรวมให้
+                </div>
               </div>
-            </div>
+            ) : (
+              /* ISSUE MODE: FEFO Lot Deduction */
+              <div className="space-y-2">
+                {matchedItem?.lots && matchedItem.lots.length > 1 ? (
+                  <div className="space-y-1.5 bg-rose-50/50 border border-rose-200/80 rounded-2xl p-3">
+                    <div className="flex items-center justify-between text-xs font-bold text-rose-900">
+                      <span className="flex items-center gap-1.5">
+                        <Clock size={13} className="text-rose-600" />
+                        <span>เลือกล็อตที่ต้องการตัดจ่าย (FEFO)</span>
+                      </span>
+                      <span className="text-[10px] text-rose-600 bg-rose-100 px-2 py-0.5 rounded-full font-bold">
+                        แนะนำ: ล็อตหมดอายุก่อน
+                      </span>
+                    </div>
+
+                    <select
+                      value={scanLotNumber}
+                      onChange={(e) => setScanLotNumber(e.target.value)}
+                      className="w-full bg-white border border-rose-200 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                    >
+                      <option value="">
+                        ⚡ อัตโนมัติ: ตัดจากล็อตหมดอายุเร็วที่สุดก่อน (FEFO: {matchedItem.lots[0].lotNumber} หมดอายุ {formatThaiDate(matchedItem.lots[0].expiryDate)})
+                      </option>
+                      {matchedItem.lots.map(lot => (
+                        <option key={lot.lotNumber} value={lot.lotNumber}>
+                          เจาะจงล็อต {lot.lotNumber} | หมดอายุ: {formatThaiDate(lot.expiryDate)} (คงเหลือ: {lot.quantity} {matchedItem.unit})
+                        </option>
+                      ))}
+                    </select>
+
+                    <p className="text-[10px] text-rose-700 leading-normal">
+                      🛡️ ระบบจะตัดจ่ายสต็อกจากล็อตที่หมดอายุเร็วที่สุดก่อนให้อัตโนมัติ เพื่อป้องกันสินค้าหมดอายุค้างคลัง
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            )}
 
             {/* Error alerts */}
             {error && (

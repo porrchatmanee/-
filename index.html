@@ -8,7 +8,7 @@
     <script>
       // CRITICAL: Prevent execution of cached old code
       (function() {
-        const REQUIRED_VER = '20261002_REV20';
+        const REQUIRED_VER = '20261002_REV21';
         const currentVer = localStorage.getItem('app_version_cache');
         if (currentVer !== REQUIRED_VER) {
           console.log('Cache mismatch in head, clearing and reloading...');
@@ -17,10 +17,10 @@
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(regs) {
               for(var i = 0; i < regs.length; i++) regs[i].unregister();
-              window.location.reload(true);
+              window.location.reload();
             });
           } else {
-            window.location.reload(true);
+            window.location.reload();
           }
         }
       })();
@@ -30,7 +30,7 @@
   </head>
   <body>
     <div id="app-v7"></div>
-    <script type="module" src="/src/main.tsx?v=20261002_rev20"></script>
+    <script type="module" src="/src/main.tsx?v=20261002_rev21"></script>
   </body>
 </html>
 

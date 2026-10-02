@@ -9,13 +9,23 @@ export interface Category {
   icon?: string;
 }
 
+export interface ItemLot {
+  lotNumber: string; // e.g. "LOT-6701" or date-based
+  expiryDate: string; // YYYY-MM-DD
+  quantity: number; // remaining in this lot
+  receivedDate?: string;
+}
+
 export interface InventoryItem {
-  id: string; // e.g. M001
+  id: string; // e.g. M001 / Barcode
   name: string;
   categoryId: CategoryId;
-  quantity: number;
+  quantity: number; // total quantity across all active lots
   unit: string;
-  expiryDate?: string;
+  expiryDate?: string; // earliest active lot expiry date (FEFO)
+  minStock?: number; // minimum stock threshold (จุดสั่งซื้อ / สต็อกต่ำสุด)
+  maxStock?: number; // maximum stock threshold (สต็อกสูงสุด / เกณฑ์เกินคลัง)
+  lots?: ItemLot[]; // breakdown of lots with differing expiration dates
 }
 
 export interface Transaction {
@@ -25,7 +35,8 @@ export interface Transaction {
   quantity: number;
   timestamp: string;
   expiryDate?: string;
-  operator?: string; // Add operator field!
+  lotNumber?: string;
+  operator?: string;
 }
 
 export interface AppState {

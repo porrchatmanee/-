@@ -79,7 +79,7 @@ export function SettingsPage() {
               <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">เวอร์ชันระบบ (App Version)</p>
-                  <span className="text-xs font-mono font-bold text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md">v20261002-REV20</span>
+                  <span className="text-xs font-mono font-bold text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md">v20261002-REV21</span>
                 </div>
                 <button 
                   onClick={() => {
