@@ -3,7 +3,7 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
-// GLOBAL BARCODE NORMALIZER (The Ultimate Fix - REV17)
+// GLOBAL BARCODE NORMALIZER (The Ultimate Fix - REV19)
 (window as any).normalizeBarcode = (text: string, forceNumeric: boolean = false) => {
   if (!text) return '';
   
@@ -41,23 +41,32 @@ import './index.css';
   return result.replace(/\s+/g, '').trim().toUpperCase();
 };
 
+// GLOBAL EMERGENCY UPDATE
+(window as any).forceAppUpdate = () => {
+  localStorage.clear();
+  sessionStorage.clear();
+  if ('caches' in window) {
+    caches.keys().then(names => {
+      for (let name of names) caches.delete(name);
+    });
+  }
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      for(let reg of regs) reg.unregister();
+      window.location.reload(true);
+    });
+  } else {
+    window.location.reload(true);
+  }
+};
+
 // EMERGENCY CACHE CLEARING
 (function() {
-  const CURRENT_VER = '20261002_REV17';
+  const CURRENT_VER = '20261002_REV19';
   const savedVer = localStorage.getItem('app_version_cache');
   if (savedVer !== CURRENT_VER) {
     console.log('New version detected (main), clearing cache...');
-    localStorage.clear();
-    localStorage.setItem('app_version_cache', CURRENT_VER);
-    
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(regs => {
-        for(let reg of regs) reg.unregister();
-        window.location.reload();
-      });
-    } else {
-      window.location.reload();
-    }
+    (window as any).forceAppUpdate();
   }
 })();
 

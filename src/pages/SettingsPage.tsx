@@ -76,9 +76,21 @@ export function SettingsPage() {
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">
                 การถ่ายโอน ลบล้าง และการจัดเก็บตรวจพบล่าสุดในแถมอุปกรณ์ผู้ใช้
               </p>
-              <div className="mt-4 pt-4 border-t border-slate-100">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">เวอร์ชันระบบ (App Version)</p>
-                <span className="text-xs font-mono font-bold text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md">v20261002-REV17</span>
+              <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">เวอร์ชันระบบ (App Version)</p>
+                  <span className="text-xs font-mono font-bold text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md">v20261002-REV19</span>
+                </div>
+                <button 
+                  onClick={() => {
+                    if (window.confirm('คุณแน่ใจหรือไม่ที่จะล้างแคชและรีโหลดระบบใหม่ทั้งหมด? (แนะนำเมื่อสแกนแล้วตัวอักษรผิดเพี้ยน)')) {
+                      (window as any).forceAppUpdate();
+                    }
+                  }}
+                  className="text-[10px] font-black text-rose-500 hover:text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 transition-all active:scale-95"
+                >
+                  ล้างแคชและอัปเดตทันที (Force Refresh)
+                </button>
               </div>
             </div>
           </div>
