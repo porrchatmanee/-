@@ -120,14 +120,15 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
 
   // Handle barcode scanned / matches -> scan twice increments the quantity
   const handleBarcodeScanned = (codeStr: string) => {
-    const code = codeStr.replace(/\s+/g, '').trim();
+    // APPLY GLOBAL NORMALIZATION
+    const code = (window as any).normalizeBarcode(codeStr, isNumericOnly);
     if (!code) return;
 
     setError('');
     setSuccessMsg('');
 
     // Look up item
-    const foundItem = items.find(i => i.id.toLowerCase() === code.toLowerCase());
+    const foundItem = items.find(i => i.id === code);
 
     if (foundItem) {
       playBeep();
@@ -899,18 +900,11 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
                 ref={barcodeInputRef}
                 type="text"
                 onChange={(e) => {
-                  let val = e.target.value;
-                  // AUTO-FIX THAI KEYBOARD MISTYPING IN REAL-TIME
-                  if (/[ก-ฮๅ/ภถุึคตจขชๆไำพะัีรนยบฟหกดเ้่สวผปแอิืทมใฝ]/.test(val)) {
-                    val = (window as any).fixBarcodeThaiMistyping(val);
-                  }
-                  
-                  // NUMERIC ONLY FILTER
-                  if (isNumericOnly) {
-                    val = (window as any).cleanToNumericOnly(val);
-                  }
-
-                  e.target.value = val;
+                  const val = e.target.value;
+                  // REAL-TIME VISUAL FEEDBACK (Optional: can keep it raw or normalize here too)
+                  // For the main input, we normalize on Enter or Scan.
+                  // But let's normalize in real-time for better UX
+                  e.target.value = (window as any).normalizeBarcode(val, isNumericOnly);
                 }}
                 onKeyDown={handleInputKeyDown}
                 placeholder="[ สแกนบาร์โค้ดที่นี่ ]"
@@ -1241,12 +1235,12 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
               )}
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-500 block">รหัสสุกิจบาร์โค้ด</label>
+                <label className="text-[10px] font-black text-slate-500 block">รหัสสุกิจบาร์โค้ด (แก้ไขได้)</label>
                 <input
                   type="text"
-                  disabled
                   value={scannedCode}
-                  className="w-full bg-slate-100 border border-slate-200 text-slate-500 px-3.5 py-2.5 rounded-xl font-mono text-xs font-bold h-10"
+                  onChange={(e) => setScannedCode((window as any).normalizeBarcode(e.target.value, isNumericOnly))}
+                  className="w-full bg-white border border-indigo-200 text-indigo-700 px-3.5 py-2.5 rounded-xl font-mono text-xs font-bold h-10 focus:ring-2 focus:ring-indigo-100 outline-none"
                 />
               </div>
 

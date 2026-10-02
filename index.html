@@ -8,7 +8,7 @@
     <script>
       // CRITICAL: Prevent execution of cached old code
       (function() {
-        const REQUIRED_VER = '20261002_REV14';
+        const REQUIRED_VER = '20261002_REV15';
         const currentVer = localStorage.getItem('app_version_cache');
         if (currentVer !== REQUIRED_VER) {
           console.log('Cache mismatch in head, clearing and reloading...');
@@ -30,7 +30,7 @@
   </head>
   <body>
     <div id="app-v7"></div>
-    <script type="module" src="/src/main.tsx?v=20261002_rev14"></script>
+    <script type="module" src="/src/main.tsx?v=20261002_rev15"></script>
   </body>
 </html>
 

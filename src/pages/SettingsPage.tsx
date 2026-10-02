@@ -78,7 +78,7 @@ export function SettingsPage() {
               </p>
               <div className="mt-4 pt-4 border-t border-slate-100">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">เวอร์ชันระบบ (App Version)</p>
-                <span className="text-xs font-mono font-bold text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md">v20261002-REV14</span>
+                <span className="text-xs font-mono font-bold text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md">v20261002-REV15</span>
               </div>
             </div>
           </div>

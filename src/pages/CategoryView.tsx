@@ -1435,18 +1435,8 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                     placeholder="สแกนหรือระบุรหัสสินค้า ตัวอย่าง M008"
                     value={newId}
                     onChange={(e) => {
-                      let val = e.target.value;
-                      // AUTO-FIX THAI KEYBOARD MISTYPING
-                      if (/[ก-ฮๅ/ภถุึคตจขชๆไำพะัีรนยบฟหกดเ้่สวผปแอิืทมใฝ]/.test(val)) {
-                        val = (window as any).fixBarcodeThaiMistyping(val);
-                      }
-
-                      // NUMERIC ONLY FILTER
-                      if (isAddNumericOnly) {
-                        val = (window as any).cleanToNumericOnly(val);
-                      }
-
-                      setNewId(val);
+                      const val = e.target.value;
+                      setNewId((window as any).normalizeBarcode(val, isAddNumericOnly));
                       setAddError('');
                     }}
                     onKeyDown={(e) => {
