@@ -4,7 +4,7 @@ import { CATEGORIES } from '../lib/constants';
 import { 
   Search, Plus, LayoutGrid, Package, ArrowLeftRight, FileText, 
   ArrowDownLeft, ArrowUpRight, AlertTriangle, Clock, Target, 
-  Layers, CircleDollarSign, Calendar, Info, X, Check, Save, Camera, RefreshCcw, Trash2, Edit, Scan
+  Layers, CircleDollarSign, Calendar, Info, X, Check, Save, Camera, RefreshCcw, Trash2, Edit, Scan, Zap
 } from 'lucide-react';
 import { InventoryItem } from '../types';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
@@ -65,13 +65,30 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
     }
   };
 
+  const [isAddTorchOn, setIsAddTorchOn] = useState<boolean>(false);
+  const addHtml5QrCodeRef = useRef<Html5Qrcode | null>(null);
+
+  // Toggle Torch/Flashlight for registration camera
+  const toggleAddTorch = async () => {
+    if (addHtml5QrCodeRef.current && addHtml5QrCodeRef.current.isScanning) {
+      try {
+        const newState = !isAddTorchOn;
+        await addHtml5QrCodeRef.current.applyVideoConstraints({
+          torch: newState
+        } as any);
+        setIsAddTorchOn(newState);
+      } catch (err) {
+        console.warn("Failed to toggle registration torch:", err);
+      }
+    }
+  };
+
   // Run camera scanner inside Add Item modal when active
   useEffect(() => {
-    let html5QrCode: Html5Qrcode | null = null;
-    
     if (isAddModalOpen && isAddCameraActive) {
       setAddCameraLoading(true);
       setAddCameraError('');
+      setIsAddTorchOn(false);
       
       const timer = setTimeout(() => {
         const elementId = "add-item-camera-view";
@@ -88,7 +105,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
         }
 
         try {
-          html5QrCode = new Html5Qrcode(elementId, {
+          const html5QrCode = new Html5Qrcode(elementId, {
             verbose: false,
             useBarCodeDetectorIfSupported: true,
             formatsToSupport: [
@@ -102,6 +119,9 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
               Html5QrcodeSupportedFormats.QR_CODE
             ]
           });
+          addHtml5QrCodeRef.current = html5QrCode;
+
+          const qrboxConfig = { width: 280, height: 180 };
 
           const startFallbackAddScanner = () => {
             const container = document.getElementById(elementId);
@@ -111,7 +131,8 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
             html5QrCode?.start(
               { facingMode: "environment" },
               {
-                fps: 10,
+                fps: 20,
+                qrbox: qrboxConfig
               },
               (decodedText) => {
                 if (decodedText && decodedText.trim()) {
@@ -168,7 +189,8 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
               html5QrCode?.start(
                 targetConstraint,
                 {
-                  fps: 10,
+                  fps: 20,
+                  qrbox: qrboxConfig
                 },
                 (decodedText) => {
                   if (decodedText && decodedText.trim()) {
@@ -204,9 +226,9 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
 
       return () => {
         clearTimeout(timer);
-        if (html5QrCode) {
-          if (html5QrCode.isScanning) {
-            html5QrCode.stop().catch(e => console.warn("Add item scanner wrap up error:", e));
+        if (addHtml5QrCodeRef.current) {
+          if (addHtml5QrCodeRef.current.isScanning) {
+            addHtml5QrCodeRef.current.stop().catch(e => console.warn("Add item scanner wrap up error:", e));
           }
         }
       };
@@ -718,7 +740,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
       itemId: adjustItem.id,
       type: adjustType,
       quantity: adjustQty,
-      expiryDate: adjustType === 'RECEIVE' && adjustExpiry ? adjustExpiry : undefined
+      expiryDate: adjustExpiry || adjustItem.expiryDate || undefined
     });
 
     setIsAdjustModalOpen(false);
@@ -1284,29 +1306,41 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                     <div className="relative aspect-video w-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-200 shadow-inner mb-2 group">
                     <div id="add-item-camera-view" className="w-full h-full object-cover"></div>
                     
-                    {addCameras.length > 1 && !addCameraLoading && (
+                    <div className="absolute bottom-2 right-2 flex gap-1.5 z-10 pointer-events-auto">
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          const currentIndex = addActiveCameraId 
-                            ? addCameras.findIndex(c => c.id === addActiveCameraId)
-                            : addCameras.findIndex(device => 
-                                device.label.toLowerCase().includes('back') || 
-                                device.label.toLowerCase().includes('environment') ||
-                                device.label.toLowerCase().includes('rear') ||
-                                device.label.toLowerCase().includes('กล้องหลัง')
-                              );
-                          const actualIndex = currentIndex >= 0 ? currentIndex : 0;
-                          const nextIndex = (actualIndex + 1) % addCameras.length;
-                          setAddActiveCameraId(addCameras[nextIndex].id);
-                        }}
-                        className="absolute bottom-2 right-2 bg-slate-900/80 text-white text-[10px] px-3 py-1.5 rounded-full border border-slate-700 backdrop-blur-md font-bold flex items-center gap-1.5 hover:bg-slate-800 transition-all z-10 pointer-events-auto"
+                        onClick={toggleAddTorch}
+                        className={`bg-slate-900/80 text-white text-[10px] px-3 py-1.5 rounded-full border backdrop-blur-md font-bold flex items-center gap-1.5 transition-all ${
+                          isAddTorchOn ? 'border-amber-500 bg-amber-600/90' : 'border-slate-700 hover:bg-slate-800'
+                        }`}
                       >
-                        <RefreshCcw size={12} />
-                        <span>สลับกล้อง ({addCameras.length})</span>
+                        <Zap size={12} className={isAddTorchOn ? 'text-white' : 'text-amber-500'} />
+                        <span>{isAddTorchOn ? 'ปิดไฟ' : 'เปิดไฟ'}</span>
                       </button>
-                    )}
+                      {addCameras.length > 1 && !addCameraLoading && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            const currentIndex = addActiveCameraId 
+                              ? addCameras.findIndex(c => c.id === addActiveCameraId)
+                              : addCameras.findIndex(device => 
+                                  device.label.toLowerCase().includes('back') || 
+                                  device.label.toLowerCase().includes('environment') ||
+                                  device.label.toLowerCase().includes('rear') ||
+                                  device.label.toLowerCase().includes('กล้องหลัง')
+                                );
+                            const actualIndex = currentIndex >= 0 ? currentIndex : 0;
+                            const nextIndex = (actualIndex + 1) % addCameras.length;
+                            setAddActiveCameraId(addCameras[nextIndex].id);
+                          }}
+                          className="bg-slate-900/80 text-white text-[10px] px-3 py-1.5 rounded-full border border-slate-700 backdrop-blur-md font-bold flex items-center gap-1.5 hover:bg-slate-800 transition-all"
+                        >
+                          <RefreshCcw size={12} />
+                          <span>สลับกล้อง ({addCameras.length})</span>
+                        </button>
+                      )}
+                    </div>
 
                     {addCameraLoading && (
                       <div className="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center text-white gap-2 p-4 text-center">
@@ -1536,17 +1570,18 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                 </div>
               </div>
 
-              {adjustType === 'RECEIVE' && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-550 block">วันหมดอายุล็อตนี้</label>
-                  <input
-                    type="date"
-                    value={adjustExpiry}
-                    onChange={(e) => setAdjustExpiry(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700"
-                  />
-                </div>
-              )}
+              {/* Show expiry date for both, but label it differently if needed */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-550 block">
+                  {adjustType === 'RECEIVE' ? 'วันหมดอายุล็อตนี้ (Batch Expiry)' : 'วันหมดอายุที่บันทึก (Current Expiry)'}
+                </label>
+                <input
+                  type="date"
+                  value={adjustExpiry || adjustItem.expiryDate || ''}
+                  onChange={(e) => setAdjustExpiry(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700"
+                />
+              </div>
 
               <div className="pt-4 flex gap-3">
                 <button

@@ -20,7 +20,7 @@ import './index.css';
 
 // EMERGENCY CACHE CLEARING FOR PERSISTENT "DISPENSE" ERRORS
 (function() {
-  const CURRENT_VER = '20261002_REV10';
+  const CURRENT_VER = '20261002_REV12';
   const savedVer = localStorage.getItem('app_version_cache');
   if (savedVer !== CURRENT_VER) {
     console.log('New version detected (main), clearing cache...');

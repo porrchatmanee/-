@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Scan, ArrowDownToLine, ArrowUpFromLine, Calendar, Info, 
   Camera, RotateCw, PlusCircle, CheckCircle, Package, HelpCircle, 
-  Plus, Layers, ListFilter, ScanLine
+  Plus, Layers, ListFilter, ScanLine, Zap
 } from 'lucide-react';
 import { useInventory } from '../lib/store';
 import { CATEGORIES } from '../lib/constants';
@@ -202,13 +202,30 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
     }
   };
 
+  const [isTorchOn, setIsTorchOn] = useState<boolean>(false);
+  const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+
+  // Toggle Torch/Flashlight
+  const toggleTorch = async () => {
+    if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
+      try {
+        const newState = !isTorchOn;
+        await html5QrCodeRef.current.applyVideoConstraints({
+          torch: newState
+        } as any);
+        setIsTorchOn(newState);
+      } catch (err) {
+        console.warn("Failed to toggle torch:", err);
+      }
+    }
+  };
+
   // Camera initialization and cleanup
   useEffect(() => {
-    let html5QrCode: Html5Qrcode | null = null;
-    
     if (isOpen && isCameraActive) {
       setCameraLoading(true);
       setScanningError('');
+      setIsTorchOn(false);
       
       const timer = setTimeout(() => {
         const elementId = "camera-scanner-view";
@@ -226,7 +243,7 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
         }
 
         try {
-          html5QrCode = new Html5Qrcode(elementId, {
+          const html5QrCode = new Html5Qrcode(elementId, {
             verbose: false,
             useBarCodeDetectorIfSupported: true,
             formatsToSupport: [
@@ -240,6 +257,9 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
               Html5QrcodeSupportedFormats.QR_CODE
             ]
           });
+          html5QrCodeRef.current = html5QrCode;
+
+          const qrboxConfig = { width: 280, height: 180 };
 
           const startFallbackScanner = () => {
             const container = document.getElementById(elementId);
@@ -249,7 +269,8 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
             html5QrCode?.start(
               { facingMode: "environment" },
               {
-                fps: 10,
+                fps: 20,
+                qrbox: qrboxConfig
               },
               (decodedText) => {
                 if (decodedText && decodedText.trim()) {
@@ -308,7 +329,8 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
               html5QrCode?.start(
                 targetConstraint,
                 {
-                  fps: 10,
+                  fps: 20,
+                  qrbox: qrboxConfig
                 },
                 (decodedText) => {
                   if (decodedText && decodedText.trim()) {
@@ -347,9 +369,9 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
 
       return () => {
         clearTimeout(timer);
-        if (html5QrCode) {
-          if (html5QrCode.isScanning) {
-            html5QrCode.stop().catch(e => console.warn("Clean camera stop error:", e));
+        if (html5QrCodeRef.current) {
+          if (html5QrCodeRef.current.isScanning) {
+            html5QrCodeRef.current.stop().catch(e => console.warn("Clean camera stop error:", e));
           }
         }
       };
@@ -394,7 +416,7 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
       itemId: item.id,
       type: mode,
       quantity,
-      expiryDate: mode === 'RECEIVE' ? expiryDate || undefined : undefined,
+      expiryDate: expiryDate || undefined,
       operator: operator || 'พยาบาล'
     });
 
@@ -906,16 +928,28 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping"></span>
                   <span>กล้องพร้อมทำงานยิงบาร์โค้ดแบบกว้าง</span>
                 </span>
-                {cameras.length > 1 && (
+                <div className="flex gap-2">
                   <button 
                     type="button"
-                    onClick={cycleCameras}
-                    className="flex items-center gap-1 bg-white hover:bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg border border-slate-200 transition-all text-[11px]"
+                    onClick={toggleTorch}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border transition-all text-[11px] ${
+                      isTorchOn ? 'bg-amber-500 text-white border-amber-600' : 'bg-white hover:bg-slate-100 text-slate-600 border-slate-200'
+                    }`}
                   >
-                    <RotateCw size={11} className="text-indigo-500" />
-                    <span>สลับกล้อง ({cameras.length})</span>
+                    <Zap size={11} className={isTorchOn ? 'text-white' : 'text-amber-500'} />
+                    <span>{isTorchOn ? 'ปิดไฟ' : 'เปิดไฟ'}</span>
                   </button>
-                )}
+                  {cameras.length > 1 && (
+                    <button 
+                      type="button"
+                      onClick={cycleCameras}
+                      className="flex items-center gap-1 bg-white hover:bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg border border-slate-200 transition-all text-[11px]"
+                    >
+                      <RotateCw size={11} className="text-indigo-500" />
+                      <span>สลับกล้อง ({cameras.length})</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* View finder window */}
