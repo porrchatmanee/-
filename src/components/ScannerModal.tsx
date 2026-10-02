@@ -187,7 +187,13 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const code = e.currentTarget.value.trim();
+      let code = e.currentTarget.value.trim();
+      
+      // AUTO-FIX THAI KEYBOARD MISTYPING
+      if (/[ก-ฮ]/.test(code)) {
+        code = (window as any).fixBarcodeThaiMistyping(code);
+      }
+
       if (code) {
         handleBarcodeScanned(code);
         // Clear input placeholder to listen for next scanner trigger
@@ -353,8 +359,9 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
   if (!isOpen) return null;
 
   // Filter selectable options based on active category view scope
+  // Always include the currently selected/scanned item in the list even if it's from another category
   const filteredItems = activeCategoryId 
-    ? items.filter(item => item.categoryId === activeCategoryId) 
+    ? items.filter(item => item.categoryId === activeCategoryId || item.id === selectedItemId) 
     : items;
 
   // Find currently matched product
@@ -1035,7 +1042,9 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
                 required
                 value={selectedItemId}
                 onChange={(e) => handleDropdownChange(e.target.value)}
-                className="w-full bg-white border border-slate-200 px-4 py-3.5 rounded-2xl text-slate-700 text-xs md:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 shadow-sm transition-all"
+                className={`w-full bg-white border px-4 py-3.5 rounded-2xl text-slate-700 text-xs md:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 shadow-sm transition-all ${
+                  scannedCode && matchedItem ? 'border-indigo-400 ring-2 ring-indigo-50' : 'border-slate-200'
+                }`}
               >
                 <option value="">-- ค้นหา เลือกรายการสินค้าที่ต้องการ --</option>
                 {filteredItems.map(item => {

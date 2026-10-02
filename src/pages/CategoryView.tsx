@@ -1385,7 +1385,12 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                     placeholder="สแกนหรือระบุรหัสสินค้า ตัวอย่าง M008"
                     value={newId}
                     onChange={(e) => {
-                      setNewId(e.target.value);
+                      let val = e.target.value;
+                      // AUTO-FIX THAI KEYBOARD MISTYPING
+                      if (/[ก-ฮ]/.test(val)) {
+                        val = (window as any).fixBarcodeThaiMistyping(val);
+                      }
+                      setNewId(val);
                       setAddError('');
                     }}
                     onKeyDown={(e) => {

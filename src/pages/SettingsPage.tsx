@@ -78,7 +78,7 @@ export function SettingsPage() {
               </p>
               <div className="mt-4 pt-4 border-t border-slate-100">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">เวอร์ชันระบบ (App Version)</p>
-                <span className="text-xs font-mono font-bold text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md">v20261002-REV7</span>
+                <span className="text-xs font-mono font-bold text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md">v20261002-REV10</span>
               </div>
             </div>
           </div>
@@ -90,20 +90,20 @@ export function SettingsPage() {
                 <AlertCircle size={24} />
               </div>
               <div>
-                <h2 className="text-xl font-bold">วิธีแก้ปัญหาเบิกสินค้าไม่ได้ (Manual Database Fix)</h2>
-                <p className="text-slate-500 text-sm mt-0.5">หากขึ้น Error ว่า DISPENSE ให้ทำตามขั้นตอนนี้ใน Supabase</p>
+                <h2 className="text-xl font-bold">วิธีแก้ปัญหาเบิกสินค้าแล้วยอดไม่ลด (Full Database Repair)</h2>
+                <p className="text-slate-500 text-sm mt-0.5">หากเบิกได้แต่ยอดไม่ลด ให้คัดลอกโค้ดชุดนี้ไปรันใหม่ทั้งหมดครับ</p>
               </div>
             </div>
 
             <div className="space-y-4 text-sm font-bold text-slate-700">
-              <p>สาเหตุ: ฐานข้อมูล Supabase ของคุณใช้โครงสร้างเก่าที่ไม่รองรับค่าคำสั่งใหม่ (ISSUE/DISPENSE)</p>
+              <p>สาเหตุ: ระบบ Trigger (ตัวคำนวณยอดอัตโนมัติ) อาจจะยังไม่ได้ถูกติดตั้งหรือติดตั้งไม่สมบูรณ์</p>
               <div className="p-6 bg-slate-900 rounded-2xl border border-slate-800">
-                <p className="text-emerald-400 mb-4 text-xs font-mono">-- 1. ไปที่หน้า SQL Editor ใน Supabase Dashboard แล้ววางโค้ดนี้</p>
+                <p className="text-emerald-400 mb-4 text-xs font-mono">-- 1. ไปที่หน้า SQL Editor ใน Supabase แล้วรันโค้ดชุดนี้ (ยาวหน่อยแต่ชัวร์ครับ)</p>
                 <pre className="text-[11px] font-mono text-white overflow-x-auto whitespace-pre leading-relaxed">
-{`-- เพิ่มค่า DISPENSE เข้าไปในระบบ (เพื่อความเข้ากันได้ 100%)
+{`-- 1. ตรวจสอบและเพิ่มค่าประเภทรายการ
 ALTER TYPE public.transaction_type ADD VALUE IF NOT EXISTS 'DISPENSE';
 
--- อัปเดตตัวคำนวณยอดให้รองรับทั้ง ISSUE และ DISPENSE
+-- 2. อัปเดตฟังก์ชันคำนวณยอด (บวกเมื่อรับเข้า / ลบเมื่อเบิกออก)
 CREATE OR REPLACE FUNCTION update_inventory_quantity()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -121,10 +121,17 @@ BEGIN
     END IF;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;`}
+$$ LANGUAGE plpgsql;
+
+-- 3. ติดตั้ง Trigger ให้ทำงานทุกครั้งที่มีการบันทึกรายการ (ลบของเก่าสร้างใหม่เพื่อให้มั่นใจ)
+DROP TRIGGER IF EXISTS after_transaction_insert ON public.transactions;
+CREATE TRIGGER after_transaction_insert
+AFTER INSERT ON public.transactions
+FOR EACH ROW
+EXECUTE FUNCTION update_inventory_quantity();`}
                 </pre>
               </div>
-              <p className="text-rose-500">💡 เมื่อรัน (Run) โค้ดด้านบนแล้ว ระบบจะบันทึกได้ทันทีโดยไม่ต้องรีโหลดครับ</p>
+              <p className="text-emerald-600">💡 เมื่อรัน (Run) จนขึ้น Success แล้ว ยอดสต็อกจะตัดอัตโนมัติทันทีที่กดเบิกครับ</p>
             </div>
           </div>
 
