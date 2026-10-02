@@ -43,6 +43,7 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
   const [regName, setRegName] = useState('');
   const [regCategory, setRegCategory] = useState<CategoryId>('medical');
   const [regUnit, setRegUnit] = useState('กล่อง');
+  const [isNumericOnly, setIsNumericOnly] = useState<boolean>(true);
   const [regQty, setRegQty] = useState<number>(10);
   const [regExpiry, setRegExpiry] = useState('');
   const [regError, setRegError] = useState('');
@@ -901,9 +902,15 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
                   let val = e.target.value;
                   // AUTO-FIX THAI KEYBOARD MISTYPING IN REAL-TIME
                   if (/[ก-ฮๅ/ภถุึคตจขชๆไำพะัีรนยบฟหกดเ้่สวผปแอิืทมใฝ]/.test(val)) {
-                    const fixed = (window as any).fixBarcodeThaiMistyping(val);
-                    e.target.value = fixed;
+                    val = (window as any).fixBarcodeThaiMistyping(val);
                   }
+                  
+                  // NUMERIC ONLY FILTER
+                  if (isNumericOnly) {
+                    val = (window as any).cleanToNumericOnly(val);
+                  }
+
+                  e.target.value = val;
                 }}
                 onKeyDown={handleInputKeyDown}
                 placeholder="[ สแกนบาร์โค้ดที่นี่ ]"
@@ -914,6 +921,21 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
             <p className="text-[10px] text-slate-400 font-bold leading-normal">
               สแกนซ้ำเพื่อเพิ่มจำนวน | สามารถแก้ไขตัวเลขด้านล่างได้
             </p>
+
+            {/* Numeric Only Toggle */}
+            <div className="flex items-center gap-2 mt-1">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={isNumericOnly}
+                  onChange={(e) => setIsNumericOnly(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                />
+                <span className="text-[10px] font-bold text-slate-500 group-hover:text-indigo-600 transition-colors">
+                  กรองเฉพาะตัวเลขเท่านั้น (Numeric Only)
+                </span>
+              </label>
+            </div>
 
             {/* Camera Option Trigger */}
             <div className="w-full pt-1 border-t border-indigo-100/40 flex justify-center">

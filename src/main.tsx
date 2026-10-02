@@ -24,9 +24,14 @@ import './index.css';
   return text.split('').map(char => mapping[char] || char).join('');
 };
 
+// STRIP NON-NUMERIC UTILITY
+(window as any).cleanToNumericOnly = (text: string) => {
+  return text.replace(/\D/g, '');
+};
+
 // EMERGENCY CACHE CLEARING FOR PERSISTENT "DISPENSE" ERRORS
 (function() {
-  const CURRENT_VER = '20261002_REV13';
+  const CURRENT_VER = '20261002_REV14';
   const savedVer = localStorage.getItem('app_version_cache');
   if (savedVer !== CURRENT_VER) {
     console.log('New version detected (main), clearing cache...');

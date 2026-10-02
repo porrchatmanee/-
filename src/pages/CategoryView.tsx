@@ -33,6 +33,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
   const [newUnit, setNewUnit] = useState('กล่อง');
   const [newExpiry, setNewExpiry] = useState('');
   const [addError, setAddError] = useState('');
+  const [isAddNumericOnly, setIsAddNumericOnly] = useState<boolean>(true);
   
   const addItemBarcodeRef = React.useRef<HTMLInputElement>(null);
   const newItemNameRef = React.useRef<HTMLInputElement>(null);
@@ -1300,6 +1301,21 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                   </button>
                 </label>
 
+                {/* Numeric Only Toggle for Registration */}
+                <div className="flex items-center gap-2 mb-2">
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <input 
+                      type="checkbox" 
+                      checked={isAddNumericOnly}
+                      onChange={(e) => setIsAddNumericOnly(e.target.checked)}
+                      className="w-3.5 h-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                    />
+                    <span className="text-[10px] font-bold text-slate-500 group-hover:text-rose-600 transition-colors">
+                      กรองเฉพาะตัวเลขเท่านั้น (Numeric Only)
+                    </span>
+                  </label>
+                </div>
+
                 {/* Collapsible live camera viewfinder frame */}
                 {isAddCameraActive && (
                   <>
@@ -1424,6 +1440,12 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                       if (/[ก-ฮๅ/ภถุึคตจขชๆไำพะัีรนยบฟหกดเ้่สวผปแอิืทมใฝ]/.test(val)) {
                         val = (window as any).fixBarcodeThaiMistyping(val);
                       }
+
+                      // NUMERIC ONLY FILTER
+                      if (isAddNumericOnly) {
+                        val = (window as any).cleanToNumericOnly(val);
+                      }
+
                       setNewId(val);
                       setAddError('');
                     }}
