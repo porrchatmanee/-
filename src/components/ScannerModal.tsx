@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Scan, ArrowDownToLine, ArrowUpFromLine, Calendar, Info, 
   Camera, RotateCw, PlusCircle, CheckCircle, Package, HelpCircle, 
-  Plus, Layers, ListFilter, ScanLine, Zap
+  Plus, Layers, ListFilter, ScanLine, Zap, AlertTriangle, Sparkles
 } from 'lucide-react';
 import { useInventory } from '../lib/store';
 import { CATEGORIES } from '../lib/constants';
 import { CategoryId, InventoryItem } from '../types';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { normalizeBarcode, containsThai, extractBarcodeDigits } from '../lib/barcode';
 
 interface ScannerModalProps {
   isOpen: boolean;
@@ -124,7 +125,7 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
   // Handle barcode scanned / matches -> scan twice increments the quantity
   const handleBarcodeScanned = (codeStr: string) => {
     // APPLY GLOBAL NORMALIZATION
-    const code = (window as any).normalizeBarcode(codeStr, isNumericOnly);
+    const code = isNumericOnly ? extractBarcodeDigits(codeStr) : normalizeBarcode(codeStr);
     if (!code) return;
 
     setError('');
@@ -382,9 +383,9 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
 
   // Safety Net: Watch scannedCode and force normalization if Thai leaks in
   useEffect(() => {
-    if (/[ก-ฮๅ/ภถุึคตจขชๆไำพะัีรนยบฟหกดเ้่สวผปแอิืทมใฝ]/.test(scannedCode)) {
-      const fixed = (window as any).normalizeBarcode(scannedCode, isNumericOnly);
-      if (fixed !== scannedCode) {
+    if (containsThai(scannedCode)) {
+      const fixed = isNumericOnly ? extractBarcodeDigits(scannedCode) : normalizeBarcode(scannedCode);
+      if (fixed && fixed !== scannedCode) {
         setScannedCode(fixed);
       }
     }
@@ -454,8 +455,10 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
       return;
     }
 
+    const cleanId = (isNumericOnly ? extractBarcodeDigits(scannedCode) : normalizeBarcode(scannedCode)) || scannedCode.trim().toUpperCase();
+
     const newItem: InventoryItem = {
-      id: scannedCode.trim().toUpperCase(),
+      id: cleanId,
       name: regName.trim(),
       categoryId: regCategory,
       quantity: regQty,
@@ -912,15 +915,21 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
                 value={rawInputValue}
                 onChange={(e) => {
                   const val = e.target.value;
-                  // Normalize in real-time
-                  const normalized = (window as any).normalizeBarcode(val, isNumericOnly);
+                  const normalized = isNumericOnly ? extractBarcodeDigits(val) : normalizeBarcode(val);
+                  setRawInputValue(normalized);
+                }}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const pasted = e.clipboardData.getData('text');
+                  const normalized = isNumericOnly ? extractBarcodeDigits(pasted) : normalizeBarcode(pasted);
                   setRawInputValue(normalized);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
                     if (rawInputValue) {
-                      handleBarcodeScanned(rawInputValue);
+                      const clean = isNumericOnly ? extractBarcodeDigits(rawInputValue) : normalizeBarcode(rawInputValue);
+                      handleBarcodeScanned(clean);
                       setRawInputValue(''); // Clear after processing
                     }
                   }
@@ -929,6 +938,40 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
                 className="w-full text-center bg-white border border-indigo-150 rounded-2xl px-4 py-6 text-base md:text-lg tracking-widest text-slate-800 placeholder-indigo-300 font-extrabold focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 shadow-sm"
               />
             </div>
+
+            {/* Instant Helper Pill if Thai script is ever detected in raw input */}
+            {containsThai(rawInputValue) && (
+              <div className="w-full p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-1.5 animate-fadeIn text-left">
+                <div className="flex items-center gap-1.5 text-amber-800 font-bold text-[11px]">
+                  <AlertTriangle size={13} className="text-amber-600 shrink-0" />
+                  <span>ตรวจพบแป้นไทย: ระบบแนะนำแปลงเป็น</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const fixed = normalizeBarcode(rawInputValue);
+                      setRawInputValue('');
+                      handleBarcodeScanned(fixed);
+                    }}
+                    className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg font-bold text-[10px] shadow-sm cursor-pointer"
+                  >
+                    ⚡ ใช้รหัส: {normalizeBarcode(rawInputValue)}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const fixed = extractBarcodeDigits(rawInputValue);
+                      setRawInputValue('');
+                      handleBarcodeScanned(fixed);
+                    }}
+                    className="px-2.5 py-1 bg-rose-600 text-white rounded-lg font-bold text-[10px] shadow-sm cursor-pointer"
+                  >
+                    🔢 ตัวเลขล้วน: {extractBarcodeDigits(rawInputValue)}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <p className="text-[10px] text-slate-400 font-bold leading-normal">
               สแกนซ้ำเพื่อเพิ่มจำนวน | สามารถแก้ไขตัวเลขด้านล่างได้
@@ -943,9 +986,8 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
                   onChange={(e) => {
                     const newMode = e.target.checked;
                     setIsNumericOnly(newMode);
-                    // Re-normalize current input if mode changed
                     if (rawInputValue) {
-                      setRawInputValue((window as any).normalizeBarcode(rawInputValue, newMode));
+                      setRawInputValue(newMode ? extractBarcodeDigits(rawInputValue) : normalizeBarcode(rawInputValue));
                     }
                   }}
                   className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
@@ -1261,12 +1303,48 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
 
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-500 block">รหัสสุกิจบาร์โค้ด (แก้ไขได้)</label>
-                <input
-                  type="text"
-                  value={scannedCode}
-                  onChange={(e) => setScannedCode((window as any).normalizeBarcode(e.target.value, isNumericOnly))}
-                  className="w-full bg-white border border-indigo-200 text-indigo-700 px-3.5 py-2.5 rounded-xl font-mono text-xs font-bold h-10 focus:ring-2 focus:ring-indigo-100 outline-none"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={scannedCode}
+                    onChange={(e) => setScannedCode(isNumericOnly ? extractBarcodeDigits(e.target.value) : normalizeBarcode(e.target.value))}
+                    className="w-full bg-white border border-indigo-200 text-indigo-700 px-3.5 py-2.5 rounded-xl font-mono text-xs font-bold h-10 focus:ring-2 focus:ring-indigo-100 outline-none"
+                  />
+                  {scannedCode && (
+                    <button
+                      type="button"
+                      onClick={() => setScannedCode('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {containsThai(scannedCode) && (
+                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-1.5 animate-fadeIn">
+                    <div className="flex items-center gap-1.5 text-amber-800 font-bold text-[11px]">
+                      <AlertTriangle size={13} className="text-amber-600 shrink-0" />
+                      <span>ตรวจพบอักษรไทยจากเครื่องสแกน</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setScannedCode(normalizeBarcode(scannedCode))}
+                        className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg font-bold text-[10px] shadow-sm cursor-pointer"
+                      >
+                        ✅ แปลงเป็น: {normalizeBarcode(scannedCode)}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setScannedCode(extractBarcodeDigits(scannedCode))}
+                        className="px-2.5 py-1 bg-rose-600 text-white rounded-lg font-bold text-[10px] shadow-sm cursor-pointer"
+                      >
+                        🔢 ตัวเลขล้วน: {extractBarcodeDigits(scannedCode)}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">

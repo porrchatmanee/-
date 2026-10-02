@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useInventory } from '../lib/store';
 import { CATEGORIES } from '../lib/constants';
+import { normalizeBarcode, containsThai, extractBarcodeDigits } from '../lib/barcode';
 import { 
   Search, Plus, LayoutGrid, Package, ArrowLeftRight, FileText, 
   ArrowDownLeft, ArrowUpRight, AlertTriangle, Clock, Target, 
-  Layers, CircleDollarSign, Calendar, Info, X, Check, Save, Camera, RefreshCcw, Trash2, Edit, Scan, Zap
+  Layers, CircleDollarSign, Calendar, Info, X, Check, Save, Camera, RefreshCcw, Trash2, Edit, Scan, Zap, Sparkles
 } from 'lucide-react';
 import { InventoryItem } from '../types';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
@@ -703,14 +704,15 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
 
   const handleAddNewItem = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanId = newId.replace(/\s+/g, '').toUpperCase();
+    // Normalize barcode strictly: if user left Thai in box, convert automatically
+    const cleanId = (isAddNumericOnly ? extractBarcodeDigits(newId) : normalizeBarcode(newId)) || newId.replace(/\s+/g, '').toUpperCase();
     if (!cleanId || !newName) {
       setAddError('กรุณากรอกรหัสและชื่อรายการ');
       return;
     }
 
     if (items.some(i => i.id.toLowerCase() === cleanId.toLowerCase())) {
-      setAddError('รหัสสินค้านี้มีอยู่ในระบบแล้ว');
+      setAddError(`รหัสสินค้านี้ "${cleanId}" มีอยู่ในระบบแล้ว`);
       return;
     }
 
@@ -1301,25 +1303,42 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                   </button>
                 </label>
 
-                {/* Numeric Only Toggle for Registration */}
-                <div className="flex items-center gap-2 mb-2">
-                  <label className="flex items-center gap-2 cursor-pointer group">
-                    <input 
-                      type="checkbox" 
-                      checked={isAddNumericOnly}
-                      onChange={(e) => {
-                        const newMode = e.target.checked;
-                        setIsAddNumericOnly(newMode);
-                        if (newId) {
-                          setNewId((window as any).normalizeBarcode(newId, newMode));
-                        }
+                {/* Mode Selector for Registration Barcode */}
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2 p-2 bg-slate-50 border border-slate-200/80 rounded-xl">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                    <Sparkles size={13} className="text-amber-500" />
+                    <span>ระบบแปลภาษาบาร์โค้ด:</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddNumericOnly(false);
+                        if (newId) setNewId(normalizeBarcode(newId, false));
                       }}
-                      className="w-3.5 h-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
-                    />
-                    <span className={`text-[10px] font-bold transition-colors ${isAddNumericOnly ? 'text-rose-600' : 'text-slate-500 group-hover:text-rose-600'}`}>
-                      {isAddNumericOnly ? '📍 โหมด: กรองเฉพาะตัวเลขเท่านั้น' : '🔓 โหมด: รองรับตัวอักษรและตัวเลข (แนะนำ)'}
-                    </span>
-                  </label>
+                      className={`text-[10px] font-black px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                        !isAddNumericOnly 
+                          ? 'bg-indigo-600 text-white shadow-sm' 
+                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      🔤 ทั้งหมด (ตัวเลข + อักษร)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddNumericOnly(true);
+                        if (newId) setNewId(extractBarcodeDigits(newId));
+                      }}
+                      className={`text-[10px] font-black px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                        isAddNumericOnly 
+                          ? 'bg-rose-600 text-white shadow-sm' 
+                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      🔢 ตัวเลขอย่างเดียว
+                    </button>
+                  </div>
                 </div>
 
                 {/* Collapsible live camera viewfinder frame */}
@@ -1434,27 +1453,78 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                 </>
               )}
 
-                  <input
-                    ref={addItemBarcodeRef}
-                    type="text"
-                    required
-                    placeholder="สแกนหรือระบุรหัสสินค้า ตัวอย่าง M008"
-                    value={newId}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setNewId((window as any).normalizeBarcode(val, isAddNumericOnly));
-                      setAddError('');
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
+                  <div className="relative">
+                    <input
+                      ref={addItemBarcodeRef}
+                      type="text"
+                      required
+                      placeholder="สแกนหรือระบุรหัสสินค้า ตัวอย่าง M008 หรือ 885..."
+                      value={newId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const cleaned = isAddNumericOnly ? extractBarcodeDigits(val) : normalizeBarcode(val);
+                        setNewId(cleaned);
+                        setAddError('');
+                      }}
+                      onPaste={(e) => {
                         e.preventDefault();
-                        if (newItemNameRef.current) {
-                          newItemNameRef.current.focus();
+                        const pasted = e.clipboardData.getData('text');
+                        const cleaned = isAddNumericOnly ? extractBarcodeDigits(pasted) : normalizeBarcode(pasted);
+                        setNewId(cleaned);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (newItemNameRef.current) {
+                            newItemNameRef.current.focus();
+                          }
                         }
-                      }
-                    }}
-                    className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-300"
-                  />
+                      }}
+                      className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-300 font-bold tracking-wider"
+                    />
+
+                    {newId && (
+                      <button
+                        type="button"
+                        onClick={() => setNewId('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full text-xs font-bold"
+                        title="ล้างค่า"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Instant Helper Pill if Thai script is ever detected in input */}
+                  {containsThai(newId) && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-2 animate-fadeIn">
+                      <div className="flex items-center gap-1.5 text-amber-800 font-bold">
+                        <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                        <span>ตรวจพบแป้นพิมพ์ไทยจากเครื่องสแกนบาร์โค้ด</span>
+                      </div>
+                      <p className="text-[11px] text-amber-700">
+                        เครื่องพิมพ์ออกมาเป็น: <code className="bg-amber-100/70 px-1 py-0.5 rounded font-mono text-amber-900 font-bold">{newId}</code>
+                      </p>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setNewId(normalizeBarcode(newId))}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-sm flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+                        >
+                          <span>✅ แปลงเป็น:</span>
+                          <span className="font-mono bg-white/20 px-1.5 py-0.5 rounded text-white">{normalizeBarcode(newId)}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNewId(extractBarcodeDigits(newId))}
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs shadow-sm flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+                        >
+                          <span>🔢 ตัวเลขล้วน:</span>
+                          <span className="font-mono bg-white/20 px-1.5 py-0.5 rounded text-white">{extractBarcodeDigits(newId)}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
               </div>
 
               <div className="space-y-1.5">
