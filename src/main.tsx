@@ -31,10 +31,10 @@ import { normalizeBarcode, extractBarcodeDigits, containsThai, thaiKedmaneeToEng
 
 // EMERGENCY CACHE CLEARING
 (function() {
-  const CURRENT_VER = '20261002_BARCODE_FIX_V3';
+  const CURRENT_VER = '20261002_FINAL_FORCE_V5';
   const savedVer = localStorage.getItem('app_version_cache');
   if (savedVer !== CURRENT_VER) {
-    console.log('New version detected (main), clearing cache and updating to BARCODE_FIX_V3...');
+    console.log('New version detected (main), clearing cache and updating to FINAL_FORCE_V5...');
     localStorage.setItem('app_version_cache', CURRENT_VER);
     // Hard reload
     window.location.reload();
