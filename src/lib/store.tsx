@@ -277,11 +277,27 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         if (updates.quantity !== undefined) dbUpdatesFields.quantity = updates.quantity;
         if (updates.unit !== undefined) dbUpdatesFields.unit = updates.unit;
         if (updates.expiryDate !== undefined) dbUpdatesFields.expiry_date = updates.expiryDate || null;
+        if (updates.minStock !== undefined) dbUpdatesFields.min_stock = updates.minStock;
+        if (updates.maxStock !== undefined) dbUpdatesFields.max_stock = updates.maxStock;
 
-        const { error } = await supabase
+        let { error } = await supabase
           .from('inventory_items')
           .update(dbUpdatesFields)
           .eq('id', id);
+
+        if (error && (error.message.includes('min_stock') || error.message.includes('max_stock') || error.code === 'PGRST204')) {
+          delete dbUpdatesFields.min_stock;
+          delete dbUpdatesFields.max_stock;
+          if (Object.keys(dbUpdatesFields).length > 0) {
+            const retry = await supabase
+              .from('inventory_items')
+              .update(dbUpdatesFields)
+              .eq('id', id);
+            error = retry.error;
+          } else {
+            error = null;
+          }
+        }
 
         if (error) throw error;
         await fetchData();
@@ -338,14 +354,24 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       setIsSyncing(true);
       setDbError(null);
       try {
-        const { error } = await supabase.from('inventory_items').insert({
+        const payload: any = {
           id: item.id,
           name: item.name,
           category_id: item.categoryId,
           quantity: item.quantity,
           unit: item.unit,
           expiry_date: item.expiryDate || null,
-        });
+        };
+        if (item.minStock !== undefined) payload.min_stock = item.minStock;
+        if (item.maxStock !== undefined) payload.max_stock = item.maxStock;
+
+        let { error } = await supabase.from('inventory_items').insert(payload);
+        if (error && (error.message.includes('min_stock') || error.message.includes('max_stock') || error.code === 'PGRST204')) {
+          delete payload.min_stock;
+          delete payload.max_stock;
+          const retry = await supabase.from('inventory_items').insert(payload);
+          error = retry.error;
+        }
 
         if (error) throw error;
         await fetchData();
