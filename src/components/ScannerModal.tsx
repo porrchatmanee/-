@@ -897,6 +897,14 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
               <input
                 ref={barcodeInputRef}
                 type="text"
+                onChange={(e) => {
+                  let val = e.target.value;
+                  // AUTO-FIX THAI KEYBOARD MISTYPING IN REAL-TIME
+                  if (/[ก-ฮๅ/ภถุึคตจขชๆไำพะัีรนยบฟหกดเ้่สวผปแอิืทมใฝ]/.test(val)) {
+                    const fixed = (window as any).fixBarcodeThaiMistyping(val);
+                    e.target.value = fixed;
+                  }
+                }}
                 onKeyDown={handleInputKeyDown}
                 placeholder="[ สแกนบาร์โค้ดที่นี่ ]"
                 className="w-full text-center bg-white border border-indigo-150 rounded-2xl px-4 py-6 text-base md:text-lg tracking-widest text-slate-800 placeholder-indigo-300 font-extrabold focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 shadow-sm"

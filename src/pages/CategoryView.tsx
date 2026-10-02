@@ -1421,7 +1421,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                     onChange={(e) => {
                       let val = e.target.value;
                       // AUTO-FIX THAI KEYBOARD MISTYPING
-                      if (/[ก-ฮ]/.test(val)) {
+                      if (/[ก-ฮๅ/ภถุึคตจขชๆไำพะัีรนยบฟหกดเ้่สวผปแอิืทมใฝ]/.test(val)) {
                         val = (window as any).fixBarcodeThaiMistyping(val);
                       }
                       setNewId(val);
