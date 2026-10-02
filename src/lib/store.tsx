@@ -133,13 +133,14 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const processTransaction = async (txArgs: Omit<Transaction, 'id' | 'timestamp'> & { operator?: string }) => {
-    // FORCE FIX FOR CACHED "DISPENSE"
-    if ((txArgs.type as any) === 'DISPENSE') {
-      txArgs.type = 'ISSUE';
-    }
+    // ULTIMATE FORCE FIX FOR CACHED OR MISMATCHED "DISPENSE" / "ISSUE"
+    let rawType = String(txArgs.type || '').trim().toUpperCase();
+    let safeType: 'RECEIVE' | 'ISSUE' = (rawType === 'RECEIVE' || rawType === 'IN') ? 'RECEIVE' : 'ISSUE';
+
     const now = new Date().toISOString();
     const newTxLocal: Transaction = {
       ...txArgs,
+      type: safeType,
       id: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       timestamp: now,
       operator: txArgs.operator || 'พยาบาล'
@@ -148,25 +149,24 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     if (isSupabaseConfigured && supabase) {
       setIsSyncing(true);
       setDbError(null);
+      
+      const insertData = {
+        item_id: String(txArgs.itemId),
+        type: safeType,
+        quantity: Number(txArgs.quantity),
+        expiry_date: txArgs.expiryDate || null,
+        operator: String(txArgs.operator || 'พยาบาล'),
+      };
+
       try {
-        // Insert transaction record to Supabase.
-        // The trigger "after_transaction_insert" automatically executes the quantity updates.
-        const { error } = await supabase.from('transactions').insert({
-          item_id: txArgs.itemId,
-          type: txArgs.type,
-          quantity: txArgs.quantity,
-          expiry_date: txArgs.expiryDate || null,
-          operator: txArgs.operator || 'พยาบาล',
-        });
+        const { error } = await supabase.from('transactions').insert(insertData);
         
         if (error) throw error;
-        
-        // Fetch fresh state reflecting DB calculation
         await fetchData();
       } catch (err: any) {
         console.error('Supabase transaction failed', err);
-        setDbError(`ไม่สามารถบันทึกและปรับปรุงยอดในฐานข้อมูลออนไลน์ได้: ${err.message || 'กรุณาตรวจสอบว่ายอดเบิกเกินยอดคงคลังหรือไม่'}`);
-        // Fallback throw inside is handled gracefully by front UI
+        const detail = `[v7] Data: ${JSON.stringify(insertData)}`;
+        setDbError(`ไม่สามารถบันทึกได้ (${detail}): ${err.message || 'Error'}`);
         throw err;
       } finally {
         setIsSyncing(false);

@@ -39,7 +39,7 @@ CREATE TABLE public.inventory_items (
 );
 
 -- 3. Create Transactions Table
-CREATE TYPE public.transaction_type AS ENUM ('RECEIVE', 'ISSUE');
+CREATE TYPE public.transaction_type AS ENUM ('RECEIVE', 'ISSUE', 'DISPENSE');
 
 CREATE TABLE public.transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -61,7 +61,7 @@ BEGIN
             expiry_date = COALESCE(NEW.expiry_date, expiry_date), 
             updated_at = NOW()
         WHERE id = NEW.item_id;
-    ELSIF NEW.type = 'ISSUE' THEN
+    ELSIF NEW.type = 'ISSUE' OR NEW.type = 'DISPENSE' THEN
         UPDATE public.inventory_items
         SET quantity = quantity - NEW.quantity,
             updated_at = NOW()

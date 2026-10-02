@@ -21,7 +21,7 @@ export interface InventoryItem {
 export interface Transaction {
   id: string;
   itemId: string;
-  type: 'RECEIVE' | 'ISSUE';
+  type: 'RECEIVE' | 'ISSUE' | 'DISPENSE';
   quantity: number;
   timestamp: string;
   expiryDate?: string;

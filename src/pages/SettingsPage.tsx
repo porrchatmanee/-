@@ -76,6 +76,55 @@ export function SettingsPage() {
               <p className="text-xs text-slate-400 mt-2 leading-relaxed">
                 การถ่ายโอน ลบล้าง และการจัดเก็บตรวจพบล่าสุดในแถมอุปกรณ์ผู้ใช้
               </p>
+              <div className="mt-4 pt-4 border-t border-slate-100">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">เวอร์ชันระบบ (App Version)</p>
+                <span className="text-xs font-mono font-bold text-indigo-500 bg-indigo-50 px-2 py-1 rounded-md">v20261002-REV7</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Database Fix Instructions Card */}
+          <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+            <div className="flex items-center gap-4 mb-6 text-rose-600">
+              <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center">
+                <AlertCircle size={24} />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">วิธีแก้ปัญหาเบิกสินค้าไม่ได้ (Manual Database Fix)</h2>
+                <p className="text-slate-500 text-sm mt-0.5">หากขึ้น Error ว่า DISPENSE ให้ทำตามขั้นตอนนี้ใน Supabase</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 text-sm font-bold text-slate-700">
+              <p>สาเหตุ: ฐานข้อมูล Supabase ของคุณใช้โครงสร้างเก่าที่ไม่รองรับค่าคำสั่งใหม่ (ISSUE/DISPENSE)</p>
+              <div className="p-6 bg-slate-900 rounded-2xl border border-slate-800">
+                <p className="text-emerald-400 mb-4 text-xs font-mono">-- 1. ไปที่หน้า SQL Editor ใน Supabase Dashboard แล้ววางโค้ดนี้</p>
+                <pre className="text-[11px] font-mono text-white overflow-x-auto whitespace-pre leading-relaxed">
+{`-- เพิ่มค่า DISPENSE เข้าไปในระบบ (เพื่อความเข้ากันได้ 100%)
+ALTER TYPE public.transaction_type ADD VALUE IF NOT EXISTS 'DISPENSE';
+
+-- อัปเดตตัวคำนวณยอดให้รองรับทั้ง ISSUE และ DISPENSE
+CREATE OR REPLACE FUNCTION update_inventory_quantity()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.type = 'RECEIVE' THEN
+        UPDATE public.inventory_items
+        SET quantity = quantity + NEW.quantity,
+            expiry_date = COALESCE(NEW.expiry_date, expiry_date), 
+            updated_at = NOW()
+        WHERE id = NEW.item_id;
+    ELSIF NEW.type = 'ISSUE' OR NEW.type = 'DISPENSE' THEN
+        UPDATE public.inventory_items
+        SET quantity = quantity - NEW.quantity,
+            updated_at = NOW()
+        WHERE id = NEW.item_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;`}
+                </pre>
+              </div>
+              <p className="text-rose-500">💡 เมื่อรัน (Run) โค้ดด้านบนแล้ว ระบบจะบันทึกได้ทันทีโดยไม่ต้องรีโหลดครับ</p>
             </div>
           </div>
 
@@ -179,7 +228,7 @@ CREATE TABLE public.inventory_items (
 );
 
 -- 4. บันทึกยอดธุรกรรมประวัติ เบิกออก/รับเข้า
-CREATE TYPE public.transaction_type AS ENUM ('RECEIVE', 'ISSUE');
+CREATE TYPE public.transaction_type AS ENUM ('RECEIVE', 'ISSUE', 'DISPENSE');
 
 CREATE TABLE public.transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -201,7 +250,7 @@ BEGIN
             expiry_date = COALESCE(NEW.expiry_date, expiry_date), 
             updated_at = NOW()
         WHERE id = NEW.item_id;
-    ELSIF NEW.type = 'ISSUE' THEN
+    ELSIF NEW.type = 'ISSUE' OR NEW.type = 'DISPENSE' THEN
         -- การ UPDATE จะล้มเหลวทันทีหากยอดเบิกลดต่ำกว่าคลัง (มี CHECK constraint บัญญัติไว้ด้านบน)
         UPDATE public.inventory_items
         SET quantity = quantity - NEW.quantity,

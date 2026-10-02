@@ -137,11 +137,29 @@ export function LayoutContent() {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  // Hardest possible reload
+                  localStorage.clear();
+                  if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(regs => {
+                      for(let reg of regs) reg.unregister();
+                    });
+                  }
+                  window.location.href = window.location.pathname + '?refresh=' + Date.now();
+                }}
+                className="px-3 py-1.5 rounded-xl text-white font-extrabold text-xs bg-rose-600 hover:bg-rose-700 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shadow-md border border-white/20"
+              >
+                <RefreshCcw size={14} />
+                ล้างแคชและรีโหลดระบบ
+              </button>
+              <button
+                onClick={() => {
+                  window.location.href = window.location.pathname + '?t=' + new Date().getTime();
+                }}
                 className="px-3 py-1.5 rounded-xl text-white font-extrabold text-xs bg-rose-500 hover:bg-rose-600 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
               >
                 <RefreshCcw size={14} />
-                อัปเดตระบบเพื่อแก้ไข
+                รีเฟรชหน้าเว็บ
               </button>
               <button
                 onClick={clearDbError}
