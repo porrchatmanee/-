@@ -189,15 +189,12 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      let code = e.currentTarget.value.trim();
+      const rawCode = e.currentTarget.value.trim();
       
-      // AUTO-FIX THAI KEYBOARD MISTYPING
-      if (/[ก-ฮ]/.test(code)) {
-        code = (window as any).fixBarcodeThaiMistyping(code);
-      }
-
-      if (code) {
-        handleBarcodeScanned(code);
+      if (rawCode) {
+        // APPLY GLOBAL NORMALIZATION IMMEDIATELY
+        const cleanCode = (window as any).normalizeBarcode(rawCode, isNumericOnly);
+        handleBarcodeScanned(cleanCode);
         // Clear input placeholder to listen for next scanner trigger
         e.currentTarget.value = '';
       }
@@ -379,6 +376,16 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
       };
     }
   }, [isOpen, isCameraActive, activeCameraId]);
+
+  // Safety Net: Watch scannedCode and force normalization if Thai leaks in
+  useEffect(() => {
+    if (/[ก-ฮๅ/ภถุึคตจขชๆไำพะัีรนยบฟหกดเ้่สวผปแอิืทมใฝ]/.test(scannedCode)) {
+      const fixed = (window as any).normalizeBarcode(scannedCode, isNumericOnly);
+      if (fixed !== scannedCode) {
+        setScannedCode(fixed);
+      }
+    }
+  }, [scannedCode, isNumericOnly]);
 
   if (!isOpen) return null;
 
