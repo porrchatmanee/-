@@ -8,12 +8,16 @@
     <script>
       // CRITICAL: Prevent execution of cached old code
       (function() {
-        const REQUIRED_VER = '20261002_REV21';
+        const REQUIRED_VER = '20261002_BARCODE_FIX_V3';
         const currentVer = localStorage.getItem('app_version_cache');
         if (currentVer !== REQUIRED_VER) {
-          console.log('Cache mismatch in head, clearing and reloading...');
-          localStorage.clear();
+          console.log('Cache mismatch in head, clearing and reloading to latest version...');
           localStorage.setItem('app_version_cache', REQUIRED_VER);
+          if ('caches' in window) {
+            caches.keys().then(function(names) {
+              for (var i = 0; i < names.length; i++) caches.delete(names[i]);
+            });
+          }
           if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(regs) {
               for(var i = 0; i < regs.length; i++) regs[i].unregister();
@@ -30,7 +34,7 @@
   </head>
   <body>
     <div id="app-v7"></div>
-    <script type="module" src="/src/main.tsx?v=20261002_rev21"></script>
+    <script type="module" src="/src/main.tsx?v=20261002_barcode_fix_v3"></script>
   </body>
 </html>
 

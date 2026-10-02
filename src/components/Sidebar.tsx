@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, ScanLine, LayoutDashboard, Settings, Layers } from 'lucide-react';
+import { Package, ScanLine, LayoutDashboard, Settings, Layers, RotateCcw } from 'lucide-react';
 import { CATEGORIES } from '../lib/constants';
 import { useInventory } from '../lib/store';
 
@@ -117,6 +117,23 @@ export function Sidebar({ currentView, onNavigate, onOpenScanner }: SidebarProps
           <span className="text-[9px] text-slate-400 leading-normal mt-0.5">
             {isOnline ? 'แชร์ข้อมูลเรียลไทม์กับทุกเครื่องแล้ว' : 'เซฟลงเครื่องนี้เท่านั้น (เปิดแชร์ออนไลน์ในคีย์ระบบ)'}
           </span>
+
+          <button
+            type="button"
+            onClick={() => {
+              if ((window as any).forceAppUpdate) {
+                (window as any).forceAppUpdate();
+              } else {
+                localStorage.removeItem('app_version_cache');
+                window.location.reload();
+              }
+            }}
+            className="mt-2 text-[10px] font-bold text-slate-500 hover:text-indigo-600 bg-white hover:bg-indigo-50 border border-slate-200 py-1 px-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+            title="คลิกเพื่อรีเฟรชและโหลดไฟล์โปรแกรมเวอร์ชันล่าสุดจากเซิร์ฟเวอร์"
+          >
+            <RotateCcw size={11} />
+            <span>โหลดเวอร์ชันล่าสุด (Refresh)</span>
+          </button>
         </div>
       </div>
     </div>

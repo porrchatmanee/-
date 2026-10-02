@@ -6,6 +6,7 @@ import { CategoryView } from '../pages/CategoryView';
 import { SettingsPage } from '../pages/SettingsPage';
 import { InventoryProvider, useInventory } from '../lib/store';
 import { Menu, X, AlertCircle, RefreshCcw } from 'lucide-react';
+import { normalizeBarcode } from '../lib/barcode';
 
 export function LayoutContent() {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -51,7 +52,8 @@ export function LayoutContent() {
         if (buffer.length >= 4) {
           // It's a scanned barcode!
           e.preventDefault();
-          setGlobalScannedCode(buffer);
+          const cleanCode = normalizeBarcode(buffer);
+          setGlobalScannedCode(cleanCode);
           setIsScannerOpen(true);
           buffer = '';
         }

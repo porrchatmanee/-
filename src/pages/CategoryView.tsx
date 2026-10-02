@@ -44,7 +44,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
   const [newMinStock, setNewMinStock] = useState<number>(10);
   const [newMaxStock, setNewMaxStock] = useState<number>(100);
   const [addError, setAddError] = useState('');
-  const [isAddNumericOnly, setIsAddNumericOnly] = useState<boolean>(false);
+  const [isAddNumericOnly, setIsAddNumericOnly] = useState<boolean>(true);
   
   const addItemBarcodeRef = React.useRef<HTMLInputElement>(null);
   const newItemNameRef = React.useRef<HTMLInputElement>(null);
