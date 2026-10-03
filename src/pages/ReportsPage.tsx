@@ -1453,7 +1453,7 @@ export function ReportsPage() {
                 if (item.expiryDate) {
                   const days = getDaysUntilExpiry(item.expiryDate);
                   if (days <= 0) reasons.push('หมดอายุแล้ว');
-                  else if (days <= 90) reason.push(`ใกล้หมดอายุ (อีก ${days} วัน)`);
+                  else if (days <= 90) reasons.push(`ใกล้หมดอายุ (อีก ${days} วัน)`);
                 }
 
                 return (

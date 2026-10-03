@@ -1035,8 +1035,8 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
 
               <div className="flex-1 space-y-3 overflow-y-auto min-w-0">
                 {groupedCategoryItems.filter(i => i.quantity > 0 && i.quantity <= i.minStock).length > 0 ? (
-                  groupedCategoryItems.filter(i => i.quantity > 0 && i.quantity <= i.minStock).map(item => (
-                    <div key={item.key} className="flex justify-between items-center text-sm gap-2 hover:bg-slate-50 p-1.5 rounded-xl transition-colors">
+                  groupedCategoryItems.filter(i => i.quantity > 0 && i.quantity <= i.minStock).map((item, idx) => (
+                    <div key={`low_${item.key || item.id}_${idx}`} className="flex justify-between items-center text-sm gap-2 hover:bg-slate-50 p-1.5 rounded-xl transition-colors">
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-slate-700 truncate text-sm" title={item.name}>{item.name}</div>
                         <div className="font-mono text-[11px] text-slate-400 font-semibold truncate" title={item.id}>
@@ -1072,8 +1072,8 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
 
               <div className="flex-1 space-y-3 overflow-y-auto font-sans min-w-0">
                 {groupedCategoryItems.filter(i => i.quantity > i.maxStock).length > 0 ? (
-                  groupedCategoryItems.filter(i => i.quantity > i.maxStock).map(item => (
-                    <div key={item.key} className="flex justify-between items-center text-sm gap-2 hover:bg-slate-50 p-1.5 rounded-xl transition-colors">
+                  groupedCategoryItems.filter(i => i.quantity > i.maxStock).map((item, idx) => (
+                    <div key={`over_${item.key || item.id}_${idx}`} className="flex justify-between items-center text-sm gap-2 hover:bg-slate-50 p-1.5 rounded-xl transition-colors">
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-slate-700 truncate text-sm" title={item.name}>{item.name}</div>
                         <div className="font-mono text-[11px] text-slate-400 font-semibold truncate" title={item.id}>
@@ -1109,8 +1109,8 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
 
               <div className="flex-1 space-y-3 overflow-y-auto min-w-0">
                 {groupedCategoryItems.filter(i => i.expiryDate).length > 0 ? (
-                  groupedCategoryItems.filter(i => i.expiryDate).map(item => (
-                    <div key={item.key} className="flex justify-between items-center text-sm gap-2 hover:bg-slate-50 p-1.5 rounded-xl transition-colors">
+                  groupedCategoryItems.filter(i => i.expiryDate).map((item, idx) => (
+                    <div key={`expiry_${item.key || item.id}_${idx}`} className="flex justify-between items-center text-sm gap-2 hover:bg-slate-50 p-1.5 rounded-xl transition-colors">
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-slate-700 truncate text-sm" title={item.name}>{item.name}</div>
                         <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold mt-0.5">
@@ -1333,9 +1333,9 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {filteredItems.map((item) => {
+                  {filteredItems.map((item, idx) => {
                     const status = getStatus(item);
-                    const itemKey = (item as any).key || item.id;
+                    const itemKey = itemViewMode === 'grouped' ? `grouped_${(item as any).key || item.id}_${idx}` : `split_${item.id}_${idx}`;
                     return (
                       <tr key={itemKey} className="hover:bg-slate-50/50 transition-colors group">
                         <td className="p-5 pl-6 text-slate-400 font-mono text-sm font-medium">

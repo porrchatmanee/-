@@ -81,18 +81,31 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem('sukjai_inventory_state_v2');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (err) {
-        console.error('Failed to load state', err);
-      }
-    }
-    return {
+    let loadedState: AppState = {
       items: INITIAL_ITEMS,
       transactions: [],
       lastUpdated: new Date().toISOString()
     };
+    if (saved) {
+      try {
+        loadedState = JSON.parse(saved);
+      } catch (err) {
+        console.error('Failed to load state', err);
+      }
+    }
+    // Auto-enrich items on load to guarantee lots & FEFO expiry are correct in local fallback
+    if (loadedState.items && loadedState.items.length > 0) {
+      loadedState.items = loadedState.items.map(item => {
+        const lots = computeItemLots(item, loadedState.transactions || []);
+        const earliestExp = getEarliestLotExpiry(lots);
+        return {
+          ...item,
+          lots,
+          expiryDate: earliestExp || item.expiryDate
+        };
+      });
+    }
+    return loadedState;
   });
 
   // Local fallback storage sync
@@ -326,7 +339,11 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           
           for (const otherId of sameNamedItemIds) {
             if (otherId !== id) {
-              await supabase.from('inventory_items').update(limitUpdates).eq('id', otherId).catch(() => {});
+              try {
+                await supabase.from('inventory_items').update(limitUpdates).eq('id', otherId);
+              } catch (e) {
+                console.warn('Failed to sync other item stock limits', e);
+              }
             }
           }
         }
@@ -344,13 +361,27 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         items: prev.items.map(item => {
           if (item.id === id) {
-            return { ...item, ...updates };
+            const temp = { ...item, ...updates };
+            const lots = computeItemLots(temp, prev.transactions);
+            const earliestExp = getEarliestLotExpiry(lots);
+            return {
+              ...temp,
+              lots,
+              expiryDate: earliestExp || temp.expiryDate
+            };
           }
           if (targetNormName && normalizeItemName(item.name) === targetNormName) {
             const limitUpdates: Partial<InventoryItem> = {};
             if (updates.minStock !== undefined) limitUpdates.minStock = updates.minStock;
             if (updates.maxStock !== undefined) limitUpdates.maxStock = updates.maxStock;
-            return { ...item, ...limitUpdates };
+            const temp = { ...item, ...limitUpdates };
+            const lots = computeItemLots(temp, prev.transactions);
+            const earliestExp = getEarliestLotExpiry(lots);
+            return {
+              ...temp,
+              lots,
+              expiryDate: earliestExp || temp.expiryDate
+            };
           }
           return item;
         }),
@@ -434,11 +465,17 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         setIsSyncing(false);
       }
     } else {
-      setState(prev => ({
-        ...prev,
-        items: [...prev.items, enrichedItem],
-        lastUpdated: new Date().toISOString()
-      }));
+      setState(prev => {
+        const enriched = { ...enrichedItem };
+        const lots = computeItemLots(enriched, prev.transactions);
+        enriched.lots = lots;
+        enriched.expiryDate = getEarliestLotExpiry(lots) || enriched.expiryDate;
+        return {
+          ...prev,
+          items: [...prev.items, enriched],
+          lastUpdated: new Date().toISOString()
+        };
+      });
     }
   };
   
