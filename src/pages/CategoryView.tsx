@@ -1868,6 +1868,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                     <option value="กระปุก">กระปุก</option>
                     <option value="อัน">อัน</option>
                     <option value="ชิ้น">ชิ้น</option>
+                    <option value="ถุง">ถุง</option>
                     <option value="แกลลอน">แกลลอน</option>
                   </select>
                 </div>
@@ -2316,6 +2317,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                     <option value="กระปุก">กระปุก</option>
                     <option value="อัน">อัน</option>
                     <option value="ชิ้น">ชิ้น</option>
+                    <option value="ถุง">ถุง</option>
                     <option value="แกลลอน">แกลลอน</option>
                   </select>
                 </div>

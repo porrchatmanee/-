@@ -1596,6 +1596,7 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
                     <option value="ขวด">ขวด</option>
                     <option value="แผง">แผง</option>
                     <option value="ชิ้น">ชิ้น</option>
+                    <option value="ถุง">ถุง</option>
                     <option value="กระปุก">กระปุก</option>
                     <option value="อัน">อัน</option>
                     <option value="แกลลอน">แกลลอน</option>
