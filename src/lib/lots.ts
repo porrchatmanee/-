@@ -175,6 +175,58 @@ export function getDaysUntilExpiry(dateStr?: string): number {
 }
 
 /**
+ * Groups inventory items by Name (aggressively normalized) to collapse duplicates.
+ * Also handles merging of lots and FEFO logic for the grouped entry.
+ */
+export function groupInventoryItems(items: InventoryItem[]): (InventoryItem & { groupBarcodes: string[] })[] {
+  const map = new Map<string, InventoryItem & { groupBarcodes: string[] }>();
+  
+  items.forEach(item => {
+    // Aggressive normalization: Remove all spaces and non-alphanumeric Thai/English characters for the key
+    // This handles "เข็ม เบอร์ 18" vs "เข็มเบอร์18" vs "เข็มเบอร์ 18 "
+    const normalizedName = item.name
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '')
+      .replace(/no\./gi, 'no')
+      .replace(/[()\-./]/g, ''); // Remove common separators that might be inconsistent
+    
+    const key = normalizedName; 
+    
+    if (map.has(key)) {
+      const existing = map.get(key)!;
+      // Sum quantities
+      existing.quantity += item.quantity;
+      // Keep track of all barcodes in this group
+      if (!existing.groupBarcodes.includes(item.id)) {
+        existing.groupBarcodes.push(item.id);
+      }
+      // FEFO logic: Keep the earliest expiry date
+      if (item.expiryDate) {
+        if (!existing.expiryDate || new Date(item.expiryDate) < new Date(existing.expiryDate)) {
+          existing.expiryDate = item.expiryDate;
+        }
+      }
+      // Merge lots if present
+      if (item.lots && item.lots.length > 0) {
+        existing.lots = sortLotsFEFO([...(existing.lots || []), ...item.lots]);
+      }
+      
+      // Keep the "best" metadata (e.g. non-empty unit)
+      if (!existing.unit && item.unit) existing.unit = item.unit;
+      
+      // Inherit min/max thresholds - use the ones from the item that has them set (non-default)
+      if (item.minStock !== undefined && item.minStock !== 10) existing.minStock = item.minStock;
+      if (item.maxStock !== undefined && item.maxStock !== 100) existing.maxStock = item.maxStock;
+    } else {
+      map.set(key, { ...item, groupBarcodes: [item.id] });
+    }
+  });
+  
+  return Array.from(map.values());
+}
+
+/**
  * Formats date into Thai locale standard (e.g. "12 ต.ค. 69")
  */
 export function formatThaiDate(dateStr?: string): string {

@@ -635,11 +635,21 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
   if (!category) return null;
 
   // Filter items in this category
-  const categoryItems = items.filter(i => i.categoryId === categoryId);
-  const filteredItems = categoryItems.filter(i => 
-    i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    i.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const categoryItems = useMemo(() => items.filter(i => i.categoryId === categoryId), [items, categoryId]);
+
+  // Unified / Grouped Category Items by Normalized Name
+  const groupedCategoryItems = useMemo(() => {
+    return groupInventoryItems(categoryItems);
+  }, [categoryItems]);
+
+  // Filter items in this category based on mode
+  const filteredItems = useMemo(() => {
+    const source = itemViewMode === 'grouped' ? groupedCategoryItems : categoryItems;
+    return source.filter(i => 
+      i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      i.id.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [itemViewMode, groupedCategoryItems, categoryItems, searchTerm]);
 
   // Helper to estimate price/value for items
   const getItemPrice = (id: string) => {
@@ -649,60 +659,6 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
     if (id === 'M004') return 55;
     return 50; // Fallback price
   };
-
-  // Unified / Grouped Category Items by Normalized Name
-  const groupedCategoryItems = useMemo(() => {
-    const groups: Record<string, {
-      key: string;
-      name: string;
-      id: string;
-      categoryId: string;
-      quantity: number;
-      unit: string;
-      minStock: number;
-      maxStock: number;
-      expiryDate?: string;
-      barcodes: string[];
-      items: InventoryItem[];
-      lots: any[];
-    }> = {};
-
-    categoryItems.forEach(item => {
-      const normKey = normalizeItemName(item.name) || item.id;
-      if (!groups[normKey]) {
-        groups[normKey] = {
-          key: normKey,
-          name: item.name,
-          id: item.id,
-          categoryId: item.categoryId,
-          quantity: 0,
-          unit: item.unit,
-          minStock: item.minStock ?? 10,
-          maxStock: item.maxStock ?? 100,
-          expiryDate: item.expiryDate,
-          barcodes: [],
-          items: [],
-          lots: [],
-        };
-      }
-      const g = groups[normKey];
-      g.quantity += item.quantity;
-      if (!g.barcodes.includes(item.id)) {
-        g.barcodes.push(item.id);
-      }
-      g.items.push(item);
-      if (item.lots) {
-        g.lots.push(...item.lots);
-      }
-      if (item.expiryDate) {
-        if (!g.expiryDate || new Date(item.expiryDate) < new Date(g.expiryDate)) {
-          g.expiryDate = item.expiryDate;
-        }
-      }
-    });
-
-    return Object.values(groups);
-  }, [categoryItems]);
 
   // 1. Calculations for upper summary cards (Based on grouped unique products)
   const totalItems = groupedCategoryItems.length;
@@ -1084,7 +1040,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-slate-700 truncate text-sm" title={item.name}>{item.name}</div>
                         <div className="font-mono text-[11px] text-slate-400 font-semibold truncate" title={item.id}>
-                          {item.id} {item.barcodes.length > 1 && `(+${item.barcodes.length - 1} รหัส)`}
+                          {item.id} {item.groupBarcodes.length > 1 && `(+${item.groupBarcodes.length - 1} รหัส)`}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
@@ -1121,7 +1077,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-slate-700 truncate text-sm" title={item.name}>{item.name}</div>
                         <div className="font-mono text-[11px] text-slate-400 font-semibold truncate" title={item.id}>
-                          {item.id} {item.barcodes.length > 1 && `(+${item.barcodes.length - 1} รหัส)`}
+                          {item.id} {item.groupBarcodes.length > 1 && `(+${item.groupBarcodes.length - 1} รหัส)`}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
@@ -1215,14 +1171,14 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                   {groupedCategoryItems.length > 0 ? (
                     groupedCategoryItems.map(item => {
                       const status = getStatus(item as any);
-                      const primaryItem = item.items[0];
+                      const primaryItem = item;
                       return (
                         <tr key={item.key} className="hover:bg-slate-50/60 transition-colors group">
                           <td className="py-3.5 pl-2 font-mono text-xs font-semibold text-slate-500">
                             <div>{item.id}</div>
-                            {item.barcodes.length > 1 && (
+                            {item.groupBarcodes.length > 1 && (
                               <span className="inline-block mt-0.5 text-[10px] font-extrabold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded-md border border-indigo-100">
-                                รวม {item.barcodes.length} บาร์โค้ด
+                                รวม {item.groupBarcodes.length} บาร์โค้ด
                               </span>
                             )}
                           </td>

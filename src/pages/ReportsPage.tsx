@@ -81,10 +81,13 @@ export function ReportsPage() {
 
   // Filtered inventory items
   const filteredInventory = useMemo(() => {
-    return items.filter(item => {
+    // Apply grouping for unified report rows
+    const baseItems = groupInventoryItems(items);
+
+    return baseItems.filter(item => {
       const matchesSearch = 
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.id.toLowerCase().includes(searchQuery.toLowerCase());
+        item.groupBarcodes.some(id => id.toLowerCase().includes(searchQuery.toLowerCase()));
       
       const matchesCategory = selectedCategory === 'all' || item.categoryId === selectedCategory;
       
@@ -110,7 +113,8 @@ export function ReportsPage() {
 
   // Critical alerts items
   const criticalItems = useMemo(() => {
-    return items.filter(item => {
+    const baseItems = groupInventoryItems(items);
+    return baseItems.filter(item => {
       const min = item.minStock ?? 10;
       const isLow = item.quantity <= min;
       const isOver = item.quantity > (item.maxStock ?? 100);
@@ -230,18 +234,29 @@ export function ReportsPage() {
       itemStatsMap.set(tx.itemId, curr);
     });
 
-    // Items list filtered by category
-    const baseItems = selectedFiscalCategory === 'all'
-      ? items
-      : items.filter(i => i.categoryId === selectedFiscalCategory);
+    // Items list filtered by category AND grouped to prevent duplicates
+    const baseItems = groupInventoryItems(
+      selectedFiscalCategory === 'all'
+        ? items
+        : items.filter(i => i.categoryId === selectedFiscalCategory)
+    );
 
     const itemStatsList = baseItems.map(item => {
-      const stats = itemStatsMap.get(item.id) || { receive: 0, issue: 0 };
+      // Aggregate stats for all barcodes in this group
+      let totalReceive = 0;
+      let totalIssue = 0;
+      
+      item.groupBarcodes.forEach(barcode => {
+        const stats = itemStatsMap.get(barcode) || { receive: 0, issue: 0 };
+        totalReceive += stats.receive;
+        totalIssue += stats.issue;
+      });
+
       return {
         ...item,
-        fiscalReceive: stats.receive,
-        fiscalIssue: stats.issue,
-        fiscalNet: stats.receive - stats.issue,
+        fiscalReceive: totalReceive,
+        fiscalIssue: totalIssue,
+        fiscalNet: totalReceive - totalIssue,
       };
     });
 
@@ -958,7 +973,12 @@ export function ReportsPage() {
                       return (
                         <tr key={item.id} className="hover:bg-slate-50/75 transition-colors">
                           <td className="py-3 px-4 text-center font-bold text-slate-400">{index + 1}</td>
-                          <td className="py-3 px-4 font-mono font-bold text-indigo-600">{item.id}</td>
+                          <td className="py-3 px-4 font-mono font-bold text-indigo-600">
+                            <div>{item.id}</div>
+                            {(item as any).groupBarcodes?.length > 1 && (
+                              <div className="text-[9px] text-slate-400 mt-0.5">(+{(item as any).groupBarcodes.length - 1} รหัส)</div>
+                            )}
+                          </td>
                           <td className="py-3 px-4 font-bold text-slate-800">
                             {item.name}
                             {item.lots && item.lots.length > 1 && (
@@ -1160,7 +1180,12 @@ export function ReportsPage() {
                       return (
                         <tr key={item.id} className="hover:bg-slate-50/75 transition-colors">
                           <td className="py-3 px-4 text-center font-bold text-slate-400">{index + 1}</td>
-                          <td className="py-3 px-4 font-mono font-bold text-indigo-600">{item.id}</td>
+                          <td className="py-3 px-4 font-mono font-bold text-indigo-600">
+                            <div>{item.id}</div>
+                            {(item as any).groupBarcodes?.length > 1 && (
+                              <div className="text-[9px] text-slate-400 mt-0.5">(+{(item as any).groupBarcodes.length - 1} รหัส)</div>
+                            )}
+                          </td>
                           <td className="py-3 px-4 font-bold text-slate-800">{item.name}</td>
                           <td className="py-3 px-4 text-center">
                             <strong className="text-slate-900">{item.quantity}</strong> / Min {min} {item.unit}

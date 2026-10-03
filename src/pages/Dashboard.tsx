@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useInventory } from '../lib/store';
 import { CATEGORIES } from '../lib/constants';
 import { InventoryItem } from '../types';
-import { formatThaiDate } from '../lib/lots';
+import { formatThaiDate, groupInventoryItems } from '../lib/lots';
 import { 
   ArrowRight, PackageOpen, AlertCircle, Search, Package, 
   Tag, Clock, Layers, CheckCircle2, AlertTriangle, X, 
@@ -26,23 +26,34 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [inspectLotItem, setInspectLotItem] = useState<InventoryItem | null>(null);
 
   // Min-Max configuration modal state (direct from Dashboard)
-  const [editMinMaxItem, setEditMinMaxItem] = useState<InventoryItem | null>(null);
+  const [editMinMaxItem, setEditMinMaxItem] = useState<(InventoryItem & { groupBarcodes?: string[] }) | null>(null);
   const [editMinStock, setEditMinStock] = useState<number>(10);
   const [editMaxStock, setEditMaxStock] = useState<number>(100);
 
-  const openDashboardMinMaxModal = (item: InventoryItem) => {
+  const openDashboardMinMaxModal = (item: InventoryItem & { groupBarcodes?: string[] }) => {
     setEditMinMaxItem(item);
     setEditMinStock(item.minStock ?? 10);
     setEditMaxStock(item.maxStock ?? 100);
   };
 
-  const handleSaveMinMax = (e: React.FormEvent) => {
+  const handleSaveMinMax = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editMinMaxItem) return;
-    updateItem(editMinMaxItem.id, {
-      minStock: Number(editMinStock) || 10,
-      maxStock: Number(editMaxStock) || 100,
-    });
+    
+    const min = Number(editMinStock) || 10;
+    const max = Number(editMaxStock) || 100;
+
+    // Apply updates to ALL barcodes in this grouped product to keep them consistent
+    const barcodesToUpdate = editMinMaxItem.groupBarcodes || [editMinMaxItem.id];
+    
+    // Process updates sequentially or in parallel
+    for (const barcode of barcodesToUpdate) {
+      await updateItem(barcode, {
+        minStock: min,
+        maxStock: max,
+      });
+    }
+    
     setEditMinMaxItem(null);
   };
 
@@ -62,11 +73,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const totalOverStock = items.filter(i => i.quantity > (i.maxStock ?? 100)).length;
   const totalOutOfStock = items.filter(i => i.quantity === 0).length;
 
-  // Filtered items list
-  const filteredItems = items.filter(item => {
+  // 1. Group items using the centralized utility
+  const groupedItems = React.useMemo(() => groupInventoryItems(items), [items]);
+
+  // 2. Filter the grouped items list based on search and filters
+  const filteredItems = groupedItems.filter(item => {
     const matchesSearch = 
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.groupBarcodes.some(id => id.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (item.lots && item.lots.some(l => l.lotNumber.toLowerCase().includes(searchTerm.toLowerCase())));
 
     const matchesCategory = selectedCategory === 'all' || item.categoryId === selectedCategory;
@@ -406,11 +420,23 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 filteredItems.map(item => {
                   const status = getStatusBadge(item);
                   const cat = CATEGORIES.find(c => c.id === item.categoryId);
+                  
+                  // Handle grouped barcodes display
+                  const displayId = item.id;
+                  const hasMultipleBarcodes = (item as any).groupBarcodes?.length > 1;
+
                   return (
                     <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
                       {/* Barcode ID */}
                       <td className="py-3.5 px-4 font-mono text-xs font-bold text-slate-500">
-                        {item.id}
+                        <div className="flex flex-col">
+                          <span>{displayId}</span>
+                          {hasMultipleBarcodes && (
+                            <span className="text-[10px] text-indigo-400 font-bold mt-0.5">
+                              (+{(item as any).groupBarcodes.length - 1} รหัสอื่นในกลุ่ม)
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Name */}
@@ -597,7 +623,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-850">กำหนดเกณฑ์ Min - Max</h3>
-                  <p className="text-xs text-slate-400 font-mono">{editMinMaxItem.name} ({editMinMaxItem.id})</p>
+                  <div className="flex flex-col">
+                    <p className="text-xs text-slate-400 font-bold">{editMinMaxItem.name}</p>
+                    <p className="text-[10px] text-slate-400 font-mono">
+                      รหัส: {editMinMaxItem.id}
+                      {editMinMaxItem.groupBarcodes && editMinMaxItem.groupBarcodes.length > 1 && (
+                        <span className="text-indigo-400 ml-1">(รวม {editMinMaxItem.groupBarcodes.length} รหัสในกลุ่มนี้)</span>
+                      )}
+                    </p>
+                  </div>
                 </div>
               </div>
               <button 
