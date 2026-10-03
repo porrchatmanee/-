@@ -268,15 +268,22 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
               Html5QrcodeSupportedFormats.EAN_8,
               Html5QrcodeSupportedFormats.CODE_128,
               Html5QrcodeSupportedFormats.CODE_39,
+              Html5QrcodeSupportedFormats.CODE_93,
+              Html5QrcodeSupportedFormats.CODABAR,
               Html5QrcodeSupportedFormats.UPC_A,
               Html5QrcodeSupportedFormats.UPC_E,
               Html5QrcodeSupportedFormats.ITF,
-              Html5QrcodeSupportedFormats.QR_CODE
+              Html5QrcodeSupportedFormats.QR_CODE,
+              Html5QrcodeSupportedFormats.DATA_MATRIX,
+              Html5QrcodeSupportedFormats.PDF_417
             ]
           });
           html5QrCodeRef.current = html5QrCode;
 
-          const qrboxConfig = { width: 280, height: 180 };
+          const qrboxConfig = (viewfinderWidth: number, viewfinderHeight: number) => ({
+            width: Math.min(Math.floor(viewfinderWidth * 0.9), 360),
+            height: Math.min(Math.floor(viewfinderHeight * 0.75), 240)
+          });
 
           const startFallbackScanner = () => {
             const container = document.getElementById(elementId);
@@ -556,10 +563,14 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
               Html5QrcodeSupportedFormats.EAN_8,
               Html5QrcodeSupportedFormats.CODE_128,
               Html5QrcodeSupportedFormats.CODE_39,
+              Html5QrcodeSupportedFormats.CODE_93,
+              Html5QrcodeSupportedFormats.CODABAR,
               Html5QrcodeSupportedFormats.UPC_A,
               Html5QrcodeSupportedFormats.UPC_E,
               Html5QrcodeSupportedFormats.ITF,
-              Html5QrcodeSupportedFormats.QR_CODE
+              Html5QrcodeSupportedFormats.QR_CODE,
+              Html5QrcodeSupportedFormats.DATA_MATRIX,
+              Html5QrcodeSupportedFormats.PDF_417
             ]
           });
 
@@ -734,10 +745,14 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
             Html5QrcodeSupportedFormats.EAN_8,
             Html5QrcodeSupportedFormats.CODE_128,
             Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_93,
+            Html5QrcodeSupportedFormats.CODABAR,
             Html5QrcodeSupportedFormats.UPC_A,
             Html5QrcodeSupportedFormats.UPC_E,
             Html5QrcodeSupportedFormats.ITF,
-            Html5QrcodeSupportedFormats.QR_CODE
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.DATA_MATRIX,
+            Html5QrcodeSupportedFormats.PDF_417
           ]
         });
 
