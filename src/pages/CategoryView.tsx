@@ -6,7 +6,7 @@ import { generateLotNumber, groupInventoryItems } from '../lib/lots';
 import { 
   Search, Plus, LayoutGrid, Package, ArrowLeftRight, FileText, 
   ArrowDownLeft, ArrowUpRight, AlertTriangle, Clock, Target, 
-  Layers, CircleDollarSign, Calendar, Info, X, Check, Save, Camera, RefreshCcw, Trash2, Edit, Scan, Zap, Sparkles, Tag, SlidersHorizontal
+  Layers, CircleDollarSign, Calendar, Info, X, Check, CheckCircle2, Save, Camera, RefreshCcw, Trash2, Edit, Scan, Zap, Sparkles, Tag, SlidersHorizontal
 } from 'lucide-react';
 import { InventoryItem } from '../types';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
@@ -31,6 +31,9 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
   const [isDirectEditModalOpen, setIsDirectEditModalOpen] = useState(false);
   const [directEditItem, setDirectEditItem] = useState<InventoryItem | null>(null);
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<InventoryItem | null>(null);
+  const [directEditBarcode, setDirectEditBarcode] = useState('');
+  const [isDirectBarcodeNumericOnly, setIsDirectBarcodeNumericOnly] = useState<boolean>(true);
+  const [directBarcodeError, setDirectBarcodeError] = useState('');
   const [directEditName, setDirectEditName] = useState('');
   const [directEditQty, setDirectEditQty] = useState(0);
   const [directEditUnit, setDirectEditUnit] = useState('กล่อง');
@@ -54,6 +57,46 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
   
   const addItemBarcodeRef = React.useRef<HTMLInputElement>(null);
   const newItemNameRef = React.useRef<HTMLInputElement>(null);
+
+  // Check if entered barcode matches an existing item across the database
+  const matchedExistingItem = useMemo(() => {
+    const trimmed = newId.trim();
+    if (!trimmed) return null;
+    const clean = isAddNumericOnly ? extractBarcodeDigits(trimmed) : normalizeBarcode(trimmed);
+    return items.find(i => {
+      const itemClean = normalizeBarcode(i.id) || i.id.trim().toUpperCase();
+      return (clean && itemClean === clean) || i.id.toLowerCase() === trimmed.toLowerCase();
+    }) || null;
+  }, [newId, items, isAddNumericOnly]);
+
+  // When matchedExistingItem is found and form fields are still empty, auto-fill them
+  useEffect(() => {
+    if (matchedExistingItem) {
+      if (!newName.trim()) {
+        setNewName(matchedExistingItem.name);
+      }
+      if (matchedExistingItem.unit && newUnit === 'กล่อง') {
+        setNewUnit(matchedExistingItem.unit);
+      }
+      if (matchedExistingItem.minStock !== undefined && newMinStock === 10) {
+        setNewMinStock(matchedExistingItem.minStock);
+      }
+      if (matchedExistingItem.maxStock !== undefined && newMaxStock === 100) {
+        setNewMaxStock(matchedExistingItem.maxStock);
+      }
+    }
+  }, [matchedExistingItem]);
+
+  // Check if modified barcode in Edit Modal collides with another existing item
+  const editBarcodeCollision = useMemo(() => {
+    if (!directEditItem || !directEditBarcode.trim()) return null;
+    const clean = (isDirectBarcodeNumericOnly ? extractBarcodeDigits(directEditBarcode) : normalizeBarcode(directEditBarcode)) || directEditBarcode.trim();
+    if (!clean || clean.toLowerCase() === directEditItem.id.toLowerCase()) return null;
+    return items.find(i => (
+      (clean && normalizeBarcode(i.id) === clean) ||
+      i.id.toLowerCase() === clean.toLowerCase()
+    ) && i.id !== directEditItem.id) || null;
+  }, [directEditBarcode, directEditItem, items, isDirectBarcodeNumericOnly]);
 
   // Camera Reader inside Add New Item registration screen
   const [isAddCameraActive, setIsAddCameraActive] = useState<boolean>(false);
@@ -753,8 +796,54 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
       return;
     }
 
-    if (items.some(i => i.id.toLowerCase() === cleanId.toLowerCase())) {
-      setAddError(`รหัสสินค้านี้ "${cleanId}" มีอยู่ในระบบแล้ว`);
+    // Check if item already exists (by normalized barcode or ID)
+    const existing = items.find(i => {
+      const itemClean = normalizeBarcode(i.id) || i.id.trim().toUpperCase();
+      return (cleanId && itemClean === cleanId) || i.id.toLowerCase() === cleanId.toLowerCase();
+    });
+
+    if (existing) {
+      // AUTOMATIC MERGE: Receive stock into existing item and record transaction & lot
+      if (newQty > 0) {
+        processTransaction({
+          itemId: existing.id,
+          type: 'RECEIVE',
+          quantity: newQty,
+          expiryDate: newExpiry || undefined,
+          lotNumber: newLot.trim() || undefined,
+          operator: 'พยาบาล'
+        });
+      }
+
+      // Sync name or min/max if updated
+      const updates: Partial<InventoryItem> = {};
+      if (newName.trim() && newName.trim() !== existing.name) {
+        updates.name = newName.trim();
+      }
+      if (newUnit && newUnit !== existing.unit) {
+        updates.unit = newUnit;
+      }
+      if (Number(newMinStock) !== undefined && Number(newMinStock) !== existing.minStock) {
+        updates.minStock = Number(newMinStock);
+      }
+      if (Number(newMaxStock) !== undefined && Number(newMaxStock) !== existing.maxStock) {
+        updates.maxStock = Number(newMaxStock);
+      }
+      if (Object.keys(updates).length > 0) {
+        updateItem(existing.id, updates);
+      }
+
+      // Reset Form
+      setNewId('');
+      setNewName('');
+      setNewQty(0);
+      setNewUnit('กล่อง');
+      setNewExpiry('');
+      setNewLot('');
+      setNewMinStock(10);
+      setNewMaxStock(100);
+      setAddError('');
+      setIsAddModalOpen(false);
       return;
     }
 
@@ -811,11 +900,13 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
 
   const openEditModal = (item: InventoryItem) => {
     setDirectEditItem(item);
+    setDirectEditBarcode(item.id);
     setDirectEditName(item.name);
     setDirectEditQty(item.quantity);
     setDirectEditUnit(item.unit);
     setDirectEditMinStock(item.minStock ?? 10);
     setDirectEditMaxStock(item.maxStock ?? 100);
+    setDirectBarcodeError('');
     setIsDirectEditModalOpen(true);
   };
 
@@ -823,7 +914,14 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
     e.preventDefault();
     if (!directEditItem) return;
 
+    let cleanBarcode = (isDirectBarcodeNumericOnly ? extractBarcodeDigits(directEditBarcode) : normalizeBarcode(directEditBarcode)) || directEditBarcode.trim();
+    if (!cleanBarcode) {
+      setDirectBarcodeError('กรุณาระบุรหัสบาร์โค้ด');
+      return;
+    }
+
     updateItem(directEditItem.id, { 
+      id: cleanBarcode,
       name: directEditName.trim() || directEditItem.name,
       quantity: directEditQty,
       unit: directEditUnit,
@@ -833,6 +931,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
     
     setIsDirectEditModalOpen(false);
     setDirectEditItem(null);
+    setDirectBarcodeError('');
   };
 
   const handleDeleteItem = (item: InventoryItem) => {
@@ -1330,7 +1429,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                📦 รวมตามชื่อสินค้า ({groupedCategoryItems.length})
+                📦 รวมสินค้าบาร์โค้ด & ชื่อเดียวกัน ({groupedCategoryItems.length})
               </button>
               <button
                 type="button"
@@ -1341,7 +1440,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                🏷️ แยกตามรหัสบาร์โค้ด ({categoryItems.length})
+                🏷️ แยกดูทุกแถวข้อมูล ({categoryItems.length})
               </button>
             </div>
           </div>
@@ -1867,6 +1966,22 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                       </div>
                     </div>
                   )}
+
+                  {/* Found Existing Item Match Notification */}
+                  {matchedExistingItem && (
+                    <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs space-y-1.5 animate-fadeIn">
+                      <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                        <span>ตรวจพบบาร์โค้ดนี้ในระบบแล้ว ({matchedExistingItem.id})</span>
+                      </div>
+                      <p className="text-[12px] text-emerald-950 font-medium">
+                        ชื่อสินค้า: <span className="font-bold underline">{matchedExistingItem.name}</span> (คงเหลือเดิม: <span className="font-bold">{matchedExistingItem.quantity}</span> {matchedExistingItem.unit})
+                      </p>
+                      <p className="text-[11px] text-emerald-700 leading-relaxed">
+                        💡 <strong>ระบบจะรวมสต็อกอัตโนมัติ:</strong> เมื่อกดบันทึก จำนวน <span className="font-bold font-mono">+{newQty} {newUnit || matchedExistingItem.unit}</span> จะถูกนำไปบวกเพิ่มเข้ากับสินค้าเดิม และบันทึกเป็นล็อตใหม่ให้ทันที
+                      </p>
+                    </div>
+                  )}
               </div>
 
               <div className="space-y-1.5">
@@ -2350,6 +2465,114 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
             </div>
             
             <form onSubmit={handleDirectEdit} className="p-6 space-y-4">
+              {/* Barcode / SKU editable field */}
+              <div className="space-y-1.5 bg-indigo-50/50 p-3.5 rounded-2xl border border-indigo-100">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-indigo-900 flex items-center gap-1.5">
+                    <Tag size={13} className="text-indigo-600" />
+                    <span>รหัสบาร์โค้ด / รหัสสินค้า (Barcode / SKU)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const prefix = (categoryId ? categoryId.substring(0, 3) : 'SKU').toUpperCase();
+                      setDirectEditBarcode(`${prefix}-${Math.floor(100000 + Math.random() * 900000)}`);
+                    }}
+                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer"
+                    title="สุ่มสร้างรหัสบาร์โค้ดใหม่"
+                  >
+                    <Zap size={11} />
+                    <span>สุ่มสร้างรหัส</span>
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={directEditBarcode}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const cleaned = isDirectBarcodeNumericOnly ? extractBarcodeDigits(val) : normalizeBarcode(val);
+                      setDirectEditBarcode(cleaned || val);
+                      setDirectBarcodeError('');
+                    }}
+                    onPaste={(e) => {
+                      e.preventDefault();
+                      const pasted = e.clipboardData.getData('text');
+                      const cleaned = isDirectBarcodeNumericOnly ? extractBarcodeDigits(pasted) : normalizeBarcode(pasted);
+                      setDirectEditBarcode(cleaned || pasted);
+                    }}
+                    placeholder="ยิงบาร์โค้ดใหม่ หรือแก้ไขตัวเลข..."
+                    className="w-full bg-white border border-indigo-200 px-3.5 py-2.5 rounded-xl font-mono text-sm font-black text-slate-800 tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  />
+                  {directEditBarcode && directEditBarcode !== directEditItem.id && (
+                    <button
+                      type="button"
+                      onClick={() => setDirectEditBarcode(directEditItem.id)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 hover:text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md cursor-pointer"
+                      title="คืนค่าเป็นรหัสเดิม"
+                    >
+                      คืนค่าเดิม
+                    </button>
+                  )}
+                </div>
+
+                {/* Helper buttons for barcode conversion */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsDirectBarcodeNumericOnly(!isDirectBarcodeNumericOnly)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border cursor-pointer ${
+                      isDirectBarcodeNumericOnly
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    🔢 {isDirectBarcodeNumericOnly ? 'โหมดตัวเลขล้วน (เปิด)' : 'โหมดตัวเลขล้วน (ปิด)'}
+                  </button>
+
+                  {containsThai(directEditBarcode) && (
+                    <button
+                      type="button"
+                      onClick={() => setDirectEditBarcode(normalizeBarcode(directEditBarcode))}
+                      className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-bold shadow-xs flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>🔄 แปลงแป้นไทย:</span>
+                      <span className="font-mono bg-white/20 px-1 rounded">{normalizeBarcode(directEditBarcode)}</span>
+                    </button>
+                  )}
+                </div>
+
+                {directEditBarcode.trim() && directEditBarcode.trim() !== directEditItem.id && (
+                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 space-y-1 animate-fadeIn">
+                    <p className="font-bold flex items-center gap-1">
+                      <AlertTriangle size={13} className="text-amber-600 shrink-0" />
+                      <span>คุณกำลังแก้ไขรหัสจาก "{directEditItem.id}" เป็น "{directEditBarcode.trim()}"</span>
+                    </p>
+                    <p className="text-[10px] text-amber-700">
+                      ประวัติการรับเข้า-เบิกจ่ายทั้งหมดจะถูกย้ายมาเชื่อมกับรหัสบาร์โค้ดใหม่นี้โดยอัตโนมัติ
+                    </p>
+                  </div>
+                )}
+
+                {editBarcodeCollision && (
+                  <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-[11px] text-rose-800 space-y-1 animate-fadeIn">
+                    <p className="font-bold flex items-center gap-1">
+                      <AlertTriangle size={13} className="text-rose-600 shrink-0" />
+                      <span>บาร์โค้ดนี้ตรงกับสินค้า "{editBarcodeCollision.name}" ในระบบแล้ว!</span>
+                    </p>
+                    <p className="text-[10px] text-rose-700">
+                      หากกดบันทึก ระบบจะรวมยอดคงเหลือและล็อตของทั้ง 2 รายการเข้าด้วยกันอัตโนมัติ
+                    </p>
+                  </div>
+                )}
+
+                {directBarcodeError && (
+                  <p className="text-xs text-rose-600 font-bold">{directBarcodeError}</p>
+                )}
+              </div>
+
               {/* Product Name */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-600 block">ชื่อรายการสินค้า</label>

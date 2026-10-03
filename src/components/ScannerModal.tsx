@@ -138,8 +138,11 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
     setError('');
     setSuccessMsg('');
 
-    // Look up item
-    const foundItem = items.find(i => i.id === code);
+    // Look up item by exact or normalized barcode
+    const foundItem = items.find(i => {
+      const itemClean = normalizeBarcode(i.id) || i.id.trim().toUpperCase();
+      return (code && itemClean === code) || i.id.toLowerCase() === code.toLowerCase();
+    });
 
     if (foundItem) {
       playBeep();
@@ -474,6 +477,32 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
     if (!cleanId) {
       const prefix = regCategory.substring(0, 3).toUpperCase();
       cleanId = `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`;
+    }
+
+    // Check if item already exists
+    const existing = items.find(i => {
+      const itemClean = normalizeBarcode(i.id) || i.id.trim().toUpperCase();
+      return (cleanId && itemClean === cleanId) || i.id.toLowerCase() === cleanId.toLowerCase();
+    });
+
+    if (existing) {
+      if (regQty > 0) {
+        processTransaction({
+          itemId: existing.id,
+          type: 'RECEIVE',
+          quantity: regQty,
+          expiryDate: regExpiry || undefined,
+          operator: 'พยาบาล'
+        });
+      }
+      playBeep();
+      setRegName('');
+      setIsRegistering(false);
+      setSelectedItemId(existing.id);
+      setScannedCode(existing.id);
+      setQuantity(1);
+      setSuccessMsg(`ตรวจพบบาร์โค้ดสินค้านี้ในระบบแล้ว ได้รวมยอดสต็อก (+${regQty} ${existing.unit}) ให้กับ "${existing.name}" เรียบร้อยแล้ว`);
+      return;
     }
 
     const newItem: InventoryItem = {

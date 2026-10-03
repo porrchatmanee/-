@@ -1,4 +1,5 @@
 import { InventoryItem, ItemLot, Transaction } from '../types';
+import { normalizeBarcode } from './barcode';
 
 /**
  * Extracts or generates a standard lot number from transaction or dates
@@ -175,30 +176,44 @@ export function getDaysUntilExpiry(dateStr?: string): number {
 }
 
 /**
- * Groups inventory items by Name (aggressively normalized) to collapse duplicates.
+ * Groups inventory items by Barcode OR Name (aggressively normalized) to collapse duplicates.
+ * Guarantees that items sharing the same barcode OR the same product name are merged seamlessly.
  * Also handles merging of lots and FEFO logic for the grouped entry.
  */
 export function groupInventoryItems(items: InventoryItem[]): (InventoryItem & { groupBarcodes: string[]; key: string })[] {
-  const map = new Map<string, InventoryItem & { groupBarcodes: string[]; key: string }>();
+  const groups: (InventoryItem & { groupBarcodes: string[]; key: string; normalizedName: string })[] = [];
   
   items.forEach(item => {
-    // Aggressive normalization: Remove all spaces and non-alphanumeric Thai/English characters for the key
-    // This handles "เข็ม เบอร์ 18" vs "เข็มเบอร์18" vs "เข็มเบอร์ 18 "
-    const normalizedName = item.name
+    const rawBarcode = item.id || '';
+    const cleanBarcode = normalizeBarcode(rawBarcode) || rawBarcode.trim().toUpperCase();
+    const normalizedName = (item.name || '')
       .toLowerCase()
       .trim()
       .replace(/\s+/g, '')
       .replace(/no\./gi, 'no')
       .replace(/[()\-./]/g, ''); // Remove common separators that might be inconsistent
     
-    const key = normalizedName; 
+    // Check if there is an existing group that matches EITHER barcode OR normalized name
+    const existing = groups.find(g => {
+      // 1. Same barcode match (across any known barcodes in this group)
+      if (cleanBarcode && g.groupBarcodes.some(b => {
+        const cleanB = normalizeBarcode(b) || b.trim().toUpperCase();
+        return cleanB === cleanBarcode;
+      })) {
+        return true;
+      }
+      // 2. Same normalized name match
+      if (normalizedName && g.normalizedName && g.normalizedName === normalizedName) {
+        return true;
+      }
+      return false;
+    });
     
-    if (map.has(key)) {
-      const existing = map.get(key)!;
+    if (existing) {
       // Sum quantities
       existing.quantity += item.quantity;
       // Keep track of all barcodes in this group
-      if (!existing.groupBarcodes.includes(item.id)) {
+      if (item.id && !existing.groupBarcodes.includes(item.id)) {
         existing.groupBarcodes.push(item.id);
       }
       // FEFO logic: Keep the earliest expiry date
@@ -208,9 +223,17 @@ export function groupInventoryItems(items: InventoryItem[]): (InventoryItem & { 
         }
       }
       // Merge lots if present
-      if (item.lots && item.lots.length > 0) {
-        existing.lots = sortLotsFEFO([...(existing.lots || []), ...item.lots]);
-      }
+      const combinedLots = [...(existing.lots || []), ...(item.lots || [])];
+      const lotMap = new Map<string, ItemLot>();
+      combinedLots.forEach(lot => {
+        const lotKey = `${lot.lotNumber || ''}_${lot.expiryDate || ''}`;
+        if (lotMap.has(lotKey)) {
+          lotMap.get(lotKey)!.quantity += lot.quantity;
+        } else {
+          lotMap.set(lotKey, { ...lot });
+        }
+      });
+      existing.lots = sortLotsFEFO(Array.from(lotMap.values()).filter(l => l.quantity > 0));
       
       // Keep the "best" metadata (e.g. non-empty unit)
       if (!existing.unit && item.unit) existing.unit = item.unit;
@@ -219,11 +242,17 @@ export function groupInventoryItems(items: InventoryItem[]): (InventoryItem & { 
       if (item.minStock !== undefined && item.minStock !== 10) existing.minStock = item.minStock;
       if (item.maxStock !== undefined && item.maxStock !== 100) existing.maxStock = item.maxStock;
     } else {
-      map.set(key, { ...item, groupBarcodes: [item.id], key });
+      const primaryKey = cleanBarcode || normalizedName || item.id;
+      groups.push({
+        ...item,
+        groupBarcodes: [item.id],
+        key: primaryKey,
+        normalizedName
+      });
     }
   });
   
-  return Array.from(map.values());
+  return groups;
 }
 
 /**

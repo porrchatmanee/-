@@ -291,45 +291,101 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       .filter(i => targetNormName && normalizeItemName(i.name) === targetNormName)
       .map(i => i.id);
 
+    const newId = updates.id ? updates.id.trim() : undefined;
+    const isChangingId = Boolean(newId && newId !== id);
+
     if (updates.minStock !== undefined || updates.maxStock !== undefined) {
       sameNamedItemIds.forEach(itemId => {
         saveStoredLimit(itemId, updates.minStock, updates.maxStock);
       });
+      if (isChangingId && newId) {
+        saveStoredLimit(newId, updates.minStock, updates.maxStock);
+      }
+    } else if (isChangingId && newId && currentItem) {
+      saveStoredLimit(newId, currentItem.minStock, currentItem.maxStock);
     }
 
     if (isSupabaseConfigured && supabase) {
       setIsSyncing(true);
       setDbError(null);
       try {
-        const dbUpdatesFields: any = {};
-        if (updates.name !== undefined) dbUpdatesFields.name = updates.name;
-        if (updates.categoryId !== undefined) dbUpdatesFields.category_id = updates.categoryId;
-        if (updates.quantity !== undefined) dbUpdatesFields.quantity = updates.quantity;
-        if (updates.unit !== undefined) dbUpdatesFields.unit = updates.unit;
-        if (updates.expiryDate !== undefined) dbUpdatesFields.expiry_date = updates.expiryDate || null;
-        if (updates.minStock !== undefined) dbUpdatesFields.min_stock = updates.minStock;
-        if (updates.maxStock !== undefined) dbUpdatesFields.max_stock = updates.maxStock;
+        if (isChangingId && newId) {
+          // Check if newId already exists in Supabase
+          const { data: existingTarget } = await supabase
+            .from('inventory_items')
+            .select('*')
+            .eq('id', newId)
+            .maybeSingle();
 
-        let { error } = await supabase
-          .from('inventory_items')
-          .update(dbUpdatesFields)
-          .eq('id', id);
-
-        if (error && (error.message.includes('min_stock') || error.message.includes('max_stock') || error.code === 'PGRST204')) {
-          delete dbUpdatesFields.min_stock;
-          delete dbUpdatesFields.max_stock;
-          if (Object.keys(dbUpdatesFields).length > 0) {
-            const retry = await supabase
-              .from('inventory_items')
-              .update(dbUpdatesFields)
-              .eq('id', id);
-            error = retry.error;
+          if (existingTarget) {
+            // MERGE: Target item already exists
+            const mergedQty = (existingTarget.quantity || 0) + (updates.quantity !== undefined ? updates.quantity : (currentItem?.quantity || 0));
+            // Re-point transactions to newId
+            await supabase.from('transactions').update({ item_id: newId }).eq('item_id', id);
+            // Delete old item
+            await supabase.from('inventory_items').delete().eq('id', id);
+            // Update target item
+            await supabase.from('inventory_items').update({
+              quantity: mergedQty,
+              name: updates.name || existingTarget.name,
+              unit: updates.unit || existingTarget.unit,
+              min_stock: updates.minStock !== undefined ? updates.minStock : existingTarget.min_stock,
+              max_stock: updates.maxStock !== undefined ? updates.maxStock : existingTarget.max_stock,
+            }).eq('id', newId);
           } else {
-            error = null;
-          }
-        }
+            // RENAME: Target item does not exist
+            const newRow = {
+              id: newId,
+              name: updates.name !== undefined ? updates.name : (currentItem?.name || 'รายการสินค้า'),
+              category_id: updates.categoryId !== undefined ? updates.categoryId : (currentItem?.categoryId || 'medical'),
+              quantity: updates.quantity !== undefined ? updates.quantity : (currentItem?.quantity || 0),
+              unit: updates.unit !== undefined ? updates.unit : (currentItem?.unit || 'ชิ้น'),
+              expiry_date: updates.expiryDate !== undefined ? (updates.expiryDate || null) : (currentItem?.expiryDate || null),
+              min_stock: updates.minStock !== undefined ? updates.minStock : (currentItem?.minStock ?? 10),
+              max_stock: updates.maxStock !== undefined ? updates.maxStock : (currentItem?.maxStock ?? 100),
+            };
 
-        if (error) throw error;
+            // 1. Insert new row with newId
+            const { error: insErr } = await supabase.from('inventory_items').insert(newRow);
+            if (insErr) throw insErr;
+
+            // 2. Re-point transactions
+            await supabase.from('transactions').update({ item_id: newId }).eq('item_id', id);
+
+            // 3. Delete old row with old id
+            await supabase.from('inventory_items').delete().eq('id', id);
+          }
+        } else {
+          const dbUpdatesFields: any = {};
+          if (updates.name !== undefined) dbUpdatesFields.name = updates.name;
+          if (updates.categoryId !== undefined) dbUpdatesFields.category_id = updates.categoryId;
+          if (updates.quantity !== undefined) dbUpdatesFields.quantity = updates.quantity;
+          if (updates.unit !== undefined) dbUpdatesFields.unit = updates.unit;
+          if (updates.expiryDate !== undefined) dbUpdatesFields.expiry_date = updates.expiryDate || null;
+          if (updates.minStock !== undefined) dbUpdatesFields.min_stock = updates.minStock;
+          if (updates.maxStock !== undefined) dbUpdatesFields.max_stock = updates.maxStock;
+
+          let { error } = await supabase
+            .from('inventory_items')
+            .update(dbUpdatesFields)
+            .eq('id', id);
+
+          if (error && (error.message.includes('min_stock') || error.message.includes('max_stock') || error.code === 'PGRST204')) {
+            delete dbUpdatesFields.min_stock;
+            delete dbUpdatesFields.max_stock;
+            if (Object.keys(dbUpdatesFields).length > 0) {
+              const retry = await supabase
+                .from('inventory_items')
+                .update(dbUpdatesFields)
+                .eq('id', id);
+              error = retry.error;
+            } else {
+              error = null;
+            }
+          }
+
+          if (error) throw error;
+        }
 
         // Auto sync min_stock and max_stock to all other items with the same name
         if ((updates.minStock !== undefined || updates.maxStock !== undefined) && sameNamedItemIds.length > 1) {
@@ -338,7 +394,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           if (updates.maxStock !== undefined) limitUpdates.max_stock = updates.maxStock;
           
           for (const otherId of sameNamedItemIds) {
-            if (otherId !== id) {
+            if (otherId !== id && otherId !== newId) {
               try {
                 await supabase.from('inventory_items').update(limitUpdates).eq('id', otherId);
               } catch (e) {
@@ -357,36 +413,82 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         setIsSyncing(false);
       }
     } else {
-      setState(prev => ({
-        ...prev,
-        items: prev.items.map(item => {
-          if (item.id === id) {
-            const temp = { ...item, ...updates };
-            const lots = computeItemLots(temp, prev.transactions);
-            const earliestExp = getEarliestLotExpiry(lots);
-            return {
-              ...temp,
-              lots,
-              expiryDate: earliestExp || temp.expiryDate
+      setState(prev => {
+        let updatedItems = [...prev.items];
+        let updatedTxs = [...prev.transactions];
+
+        if (isChangingId && newId) {
+          // Re-point transactions
+          updatedTxs = updatedTxs.map(tx => tx.itemId === id ? { ...tx, itemId: newId } : tx);
+
+          const existingTargetIndex = updatedItems.findIndex(i => i.id === newId);
+          if (existingTargetIndex >= 0) {
+            // Merge with existing
+            const target = updatedItems[existingTargetIndex];
+            const mergedQty = target.quantity + (updates.quantity !== undefined ? updates.quantity : (currentItem?.quantity || 0));
+            const mergedItem: InventoryItem = {
+              ...target,
+              ...updates,
+              id: newId,
+              quantity: mergedQty,
             };
+            const lots = computeItemLots(mergedItem, updatedTxs);
+            mergedItem.lots = lots;
+            mergedItem.expiryDate = getEarliestLotExpiry(lots) || target.expiryDate;
+
+            updatedItems[existingTargetIndex] = mergedItem;
+            updatedItems = updatedItems.filter(i => i.id !== id);
+          } else {
+            // Rename
+            updatedItems = updatedItems.map(item => {
+              if (item.id === id) {
+                const updated: InventoryItem = { ...item, ...updates, id: newId };
+                const lots = computeItemLots(updated, updatedTxs);
+                return {
+                  ...updated,
+                  lots,
+                  expiryDate: getEarliestLotExpiry(lots) || updated.expiryDate,
+                };
+              }
+              return item;
+            });
           }
-          if (targetNormName && normalizeItemName(item.name) === targetNormName) {
-            const limitUpdates: Partial<InventoryItem> = {};
-            if (updates.minStock !== undefined) limitUpdates.minStock = updates.minStock;
-            if (updates.maxStock !== undefined) limitUpdates.maxStock = updates.maxStock;
-            const temp = { ...item, ...limitUpdates };
-            const lots = computeItemLots(temp, prev.transactions);
-            const earliestExp = getEarliestLotExpiry(lots);
-            return {
-              ...temp,
-              lots,
-              expiryDate: earliestExp || temp.expiryDate
-            };
-          }
-          return item;
-        }),
-        lastUpdated: new Date().toISOString()
-      }));
+        } else {
+          updatedItems = updatedItems.map(item => {
+            if (item.id === id) {
+              const temp = { ...item, ...updates };
+              const lots = computeItemLots(temp, updatedTxs);
+              const earliestExp = getEarliestLotExpiry(lots);
+              return {
+                ...temp,
+                lots,
+                expiryDate: earliestExp || temp.expiryDate
+              };
+            }
+            if (targetNormName && normalizeItemName(item.name) === targetNormName) {
+              const limitUpdates: Partial<InventoryItem> = {};
+              if (updates.minStock !== undefined) limitUpdates.minStock = updates.minStock;
+              if (updates.maxStock !== undefined) limitUpdates.maxStock = updates.maxStock;
+              const temp = { ...item, ...limitUpdates };
+              const lots = computeItemLots(temp, updatedTxs);
+              const earliestExp = getEarliestLotExpiry(lots);
+              return {
+                ...temp,
+                lots,
+                expiryDate: earliestExp || temp.expiryDate
+              };
+            }
+            return item;
+          });
+        }
+
+        return {
+          ...prev,
+          items: updatedItems,
+          transactions: updatedTxs,
+          lastUpdated: new Date().toISOString()
+        };
+      });
     }
   };
 
@@ -426,6 +528,21 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   };
   
   const addItem = async (item: InventoryItem) => {
+    // Check if item with same barcode or ID already exists
+    const cleanId = (item.id || '').trim().toLowerCase();
+    const existingSameId = state.items.find(i => (i.id || '').trim().toLowerCase() === cleanId);
+    if (existingSameId) {
+      await updateItem(existingSameId.id, {
+        quantity: existingSameId.quantity + item.quantity,
+        name: existingSameId.name || item.name,
+        unit: existingSameId.unit || item.unit,
+        expiryDate: item.expiryDate && (!existingSameId.expiryDate || new Date(item.expiryDate) < new Date(existingSameId.expiryDate))
+          ? item.expiryDate
+          : existingSameId.expiryDate,
+      });
+      return;
+    }
+
     // Inherit Min/Max from existing item if same name exists
     const existingSameName = state.items.find(i => normalizeItemName(i.name) === normalizeItemName(item.name));
     const effectiveMin = item.minStock !== undefined ? item.minStock : (existingSameName?.minStock ?? 10);
