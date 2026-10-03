@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useInventory, normalizeItemName } from '../lib/store';
 import { CATEGORIES } from '../lib/constants';
-import { normalizeBarcode, containsThai, extractBarcodeDigits } from '../lib/barcode';
+import { normalizeBarcode, containsThai, extractBarcodeDigits, parseGS1Barcode, areBarcodesMatching } from '../lib/barcode';
 import { generateLotNumber, groupInventoryItems } from '../lib/lots';
 import { 
   Search, Plus, LayoutGrid, Package, ArrowLeftRight, FileText, 
@@ -58,34 +58,43 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
   const addItemBarcodeRef = React.useRef<HTMLInputElement>(null);
   const newItemNameRef = React.useRef<HTMLInputElement>(null);
 
-  // Check if entered barcode matches an existing item across the database
+  // Parse GS1 barcode if scanned format contains AIs
+  const parsedAddGS1 = useMemo(() => {
+    return parseGS1Barcode(newId);
+  }, [newId]);
+
+  // Check if entered barcode matches an existing item across the database using intelligent matching
   const matchedExistingItem = useMemo(() => {
     const trimmed = newId.trim();
     if (!trimmed) return null;
-    const clean = isAddNumericOnly ? extractBarcodeDigits(trimmed) : normalizeBarcode(trimmed);
-    return items.find(i => {
-      const itemClean = normalizeBarcode(i.id) || i.id.trim().toUpperCase();
-      return (clean && itemClean === clean) || i.id.toLowerCase() === trimmed.toLowerCase();
-    }) || null;
-  }, [newId, items, isAddNumericOnly]);
+    return items.find(i => areBarcodesMatching(trimmed, i.id)) || null;
+  }, [newId, items]);
 
-  // When matchedExistingItem is found and form fields are still empty, auto-fill them
+  // When matchedExistingItem is found, immediately auto-fill product name and details!
   useEffect(() => {
     if (matchedExistingItem) {
-      if (!newName.trim()) {
-        setNewName(matchedExistingItem.name);
-      }
-      if (matchedExistingItem.unit && newUnit === 'กล่อง') {
+      setNewName(matchedExistingItem.name);
+      if (matchedExistingItem.unit) {
         setNewUnit(matchedExistingItem.unit);
       }
-      if (matchedExistingItem.minStock !== undefined && newMinStock === 10) {
+      if (matchedExistingItem.minStock !== undefined) {
         setNewMinStock(matchedExistingItem.minStock);
       }
-      if (matchedExistingItem.maxStock !== undefined && newMaxStock === 100) {
+      if (matchedExistingItem.maxStock !== undefined) {
         setNewMaxStock(matchedExistingItem.maxStock);
       }
     }
-  }, [matchedExistingItem]);
+    
+    // Auto-fill expiry & lot from GS1 if available
+    if (parsedAddGS1.isGS1) {
+      if (parsedAddGS1.expiryDate && !newExpiry) {
+        setNewExpiry(parsedAddGS1.expiryDate);
+      }
+      if (parsedAddGS1.lotNumber && !newLot) {
+        setNewLot(parsedAddGS1.lotNumber);
+      }
+    }
+  }, [matchedExistingItem, parsedAddGS1]);
 
   // Check if modified barcode in Edit Modal collides with another existing item
   const editBarcodeCollision = useMemo(() => {
@@ -811,11 +820,8 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
       return;
     }
 
-    // Check if item already exists (by normalized barcode or ID)
-    const existing = items.find(i => {
-      const itemClean = normalizeBarcode(i.id) || i.id.trim().toUpperCase();
-      return (cleanId && itemClean === cleanId) || i.id.toLowerCase() === cleanId.toLowerCase();
-    });
+    // Check if item already exists (by intelligent barcode matching)
+    const existing = items.find(i => areBarcodesMatching(cleanId, i.id));
 
     if (existing) {
       // AUTOMATIC MERGE: Receive stock into existing item and record transaction & lot
@@ -1707,423 +1713,500 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
 
       {/* -------------------- MODAL: ADD NEW ITEM -------------------- */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden transform transition-all">
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
-              <h3 className="text-xl font-bold text-slate-850">เพิ่มรายการสินค้าใหม่</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-slate-900/50 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden transform transition-all">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0 bg-slate-50/70">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100 font-bold">
+                  <Plus size={22} />
+                </div>
+                <div>
+                  <h3 className="text-lg md:text-xl font-black text-slate-900">เพิ่มรายการสินค้าใหม่</h3>
+                  <p className="text-xs text-slate-400">ลงทะเบียนเวชภัณฑ์ใหม่ หรือสแกนเพื่อเพิ่มสต็อกเข้าสินค้าเดิม</p>
+                </div>
+              </div>
               <button 
                 onClick={() => setIsAddModalOpen(false)}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full"
+                className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-full transition-all cursor-pointer"
               >
                 <X size={20} />
               </button>
             </div>
             
-            <form onSubmit={handleAddNewItem} className="p-6 space-y-4">
+            <form onSubmit={handleAddNewItem} className="flex-1 overflow-y-auto p-5 md:p-6 space-y-5">
               {addError && (
                 <div className="p-3 bg-rose-50 text-rose-600 rounded-xl border border-rose-100 text-xs font-bold flex items-center gap-1.5">
                   <Info size={14} />
                   <span>{addError}</span>
                 </div>
               )}
-              
-              <div className="space-y-1.5">
-                <div className="text-xs font-bold text-slate-550 flex items-center justify-between flex-wrap gap-1.5">
-                  <span>รหัสสินค้า / รหัสบาร์โค้ด <span className="text-[10px] text-slate-400 font-normal">(เว้นว่างได้)</span></span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const prefix = (categoryId ? categoryId.substring(0, 3) : 'SKU').toUpperCase();
-                        const autoCode = `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`;
-                        setNewId(autoCode);
-                        setAddError('');
-                      }}
-                      className="text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-all flex items-center gap-1 cursor-pointer"
-                      title="สุ่มสร้างรหัสสินค้าอัตโนมัติ สำหรับสินค้าที่ไม่มีบาร์โค้ด"
-                    >
-                      <Zap size={11} className="text-emerald-600" />
-                      <span>⚡ สร้างรหัสอัตโนมัติ (ไม่มีบาร์โค้ด)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddCameraActive(!isAddCameraActive)}
-                      className={`text-[10px] font-bold px-2 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
-                        isAddCameraActive 
-                          ? 'bg-rose-500 text-white' 
-                          : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
-                      }`}
-                    >
-                      <Camera size={11} />
-                      <span>{isAddCameraActive ? '🔒 ปิดกล้อง' : '📸 สแกนด้วยกล้อง'}</span>
-                    </button>
-                  </div>
-                </div>
 
-                {/* Mode Selector for Registration Barcode */}
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-2 p-2 bg-slate-50 border border-slate-200/80 rounded-xl">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
-                    <Sparkles size={13} className="text-amber-500" />
-                    <span>ระบบแปลภาษาบาร์โค้ด:</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsAddNumericOnly(false);
-                        if (newId) setNewId(normalizeBarcode(newId, false));
-                      }}
-                      className={`text-[10px] font-black px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                        !isAddNumericOnly 
-                          ? 'bg-indigo-600 text-white shadow-sm' 
-                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      🔤 ทั้งหมด (ตัวเลข + อักษร)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsAddNumericOnly(true);
-                        if (newId) setNewId(extractBarcodeDigits(newId));
-                      }}
-                      className={`text-[10px] font-black px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                        isAddNumericOnly 
-                          ? 'bg-rose-600 text-white shadow-sm' 
-                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      🔢 ตัวเลขอย่างเดียว
-                    </button>
-                  </div>
-                </div>
-
-                {/* Collapsible live camera viewfinder frame */}
-                {isAddCameraActive && (
-                  <>
-                    <div className="relative aspect-video w-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-200 shadow-inner mb-2 group">
-                    <div id="add-item-camera-view" className="w-full h-full object-cover"></div>
-                    
-                    <div className="absolute bottom-2 right-2 flex gap-1.5 z-10 pointer-events-auto">
-                      <button
-                        type="button"
-                        onClick={toggleAddTorch}
-                        className={`bg-slate-900/80 text-white text-[10px] px-3 py-1.5 rounded-full border backdrop-blur-md font-bold flex items-center gap-1.5 transition-all ${
-                          isAddTorchOn ? 'border-amber-500 bg-amber-600/90' : 'border-slate-700 hover:bg-slate-800'
-                        }`}
-                      >
-                        <Zap size={12} className={isAddTorchOn ? 'text-white' : 'text-amber-500'} />
-                        <span>{isAddTorchOn ? 'ปิดไฟ' : 'เปิดไฟ'}</span>
-                      </button>
-                      {addCameras.length > 1 && !addCameraLoading && (
+              {/* 2-Column Responsive Layout */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+                
+                {/* Column 1: Barcode & Product Identification */}
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <div className="text-xs font-bold text-slate-550 flex items-center justify-between flex-wrap gap-1.5">
+                      <span>รหัสสินค้า / รหัสบาร์โค้ด <span className="text-[10px] text-slate-400 font-normal">(เว้นว่างได้)</span></span>
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            const currentIndex = addActiveCameraId 
-                              ? addCameras.findIndex(c => c.id === addActiveCameraId)
-                              : addCameras.findIndex(device => 
-                                  device.label.toLowerCase().includes('back') || 
-                                  device.label.toLowerCase().includes('environment') ||
-                                  device.label.toLowerCase().includes('rear') ||
-                                  device.label.toLowerCase().includes('กล้องหลัง')
-                                );
-                            const actualIndex = currentIndex >= 0 ? currentIndex : 0;
-                            const nextIndex = (actualIndex + 1) % addCameras.length;
-                            setAddActiveCameraId(addCameras[nextIndex].id);
+                          onClick={() => {
+                            const prefix = (categoryId ? categoryId.substring(0, 3) : 'SKU').toUpperCase();
+                            const autoCode = `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`;
+                            setNewId(autoCode);
+                            setAddError('');
                           }}
-                          className="bg-slate-900/80 text-white text-[10px] px-3 py-1.5 rounded-full border border-slate-700 backdrop-blur-md font-bold flex items-center gap-1.5 hover:bg-slate-800 transition-all"
+                          className="text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-all flex items-center gap-1 cursor-pointer"
+                          title="สุ่มสร้างรหัสสินค้าอัตโนมัติ สำหรับสินค้าที่ไม่มีบาร์โค้ด"
                         >
-                          <RefreshCcw size={12} />
-                          <span>สลับกล้อง ({addCameras.length})</span>
+                          <Zap size={11} className="text-emerald-600" />
+                          <span>⚡ สร้างรหัสอัตโนมัติ</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddCameraActive(!isAddCameraActive)}
+                          className={`text-[10px] font-bold px-2 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                            isAddCameraActive 
+                              ? 'bg-rose-500 text-white' 
+                              : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                          }`}
+                        >
+                          <Camera size={11} />
+                          <span>{isAddCameraActive ? '🔒 ปิดกล้อง' : '📸 สแกนด้วยกล้อง'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Mode Selector for Registration Barcode */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-50 border border-slate-200/80 rounded-xl">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                        <Sparkles size={13} className="text-amber-500" />
+                        <span>ระบบแปลภาษาบาร์โค้ด:</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddNumericOnly(false);
+                            if (newId) setNewId(normalizeBarcode(newId, false));
+                          }}
+                          className={`text-[10px] font-black px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                            !isAddNumericOnly 
+                              ? 'bg-indigo-600 text-white shadow-sm' 
+                              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          🔤 ทั้งหมด (ตัวเลข + อักษร)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddNumericOnly(true);
+                            if (newId) setNewId(extractBarcodeDigits(newId));
+                          }}
+                          className={`text-[10px] font-black px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                            isAddNumericOnly 
+                              ? 'bg-rose-600 text-white shadow-sm' 
+                              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          🔢 ตัวเลขอย่างเดียว
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Collapsible live camera viewfinder frame */}
+                    {isAddCameraActive && (
+                      <>
+                        <div className="relative aspect-video w-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-200 shadow-inner mb-2 group">
+                          <div id="add-item-camera-view" className="w-full h-full object-cover"></div>
+                          
+                          <div className="absolute bottom-2 right-2 flex gap-1.5 z-10 pointer-events-auto">
+                            <button
+                              type="button"
+                              onClick={toggleAddTorch}
+                              className={`bg-slate-900/80 text-white text-[10px] px-3 py-1.5 rounded-full border backdrop-blur-md font-bold flex items-center gap-1.5 transition-all ${
+                                isAddTorchOn ? 'border-amber-500 bg-amber-600/90' : 'border-slate-700 hover:bg-slate-800'
+                              }`}
+                            >
+                              <Zap size={12} className={isAddTorchOn ? 'text-white' : 'text-amber-500'} />
+                              <span>{isAddTorchOn ? 'ปิดไฟ' : 'เปิดไฟ'}</span>
+                            </button>
+                            {addCameras.length > 1 && !addCameraLoading && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  const currentIndex = addActiveCameraId 
+                                    ? addCameras.findIndex(c => c.id === addActiveCameraId)
+                                    : addCameras.findIndex(device => 
+                                        device.label.toLowerCase().includes('back') || 
+                                        device.label.toLowerCase().includes('environment') ||
+                                        device.label.toLowerCase().includes('rear') ||
+                                        device.label.toLowerCase().includes('กล้องหลัง')
+                                      );
+                                  const actualIndex = currentIndex >= 0 ? currentIndex : 0;
+                                  const nextIndex = (actualIndex + 1) % addCameras.length;
+                                  setAddActiveCameraId(addCameras[nextIndex].id);
+                                }}
+                                className="bg-slate-900/80 text-white text-[10px] px-3 py-1.5 rounded-full border border-slate-700 backdrop-blur-md font-bold flex items-center gap-1.5 hover:bg-slate-800 transition-all"
+                              >
+                                <RefreshCcw size={12} />
+                                <span>สลับกล้อง ({addCameras.length})</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {addCameraLoading && (
+                            <div className="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center text-white gap-2 p-4 text-center">
+                              <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                              <p className="text-[10px] font-bold text-indigo-200">กำลังเชื่อมต่อภาพสดกล้อง...</p>
+                            </div>
+                          )}
+
+                          {!addCameraLoading && !addCameraError && (
+                            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+                              <div className="w-[85%] h-[55%] border-2 border-indigo-400 rounded-xl relative flex flex-col justify-between items-center shadow-[0_0_0_1000px_rgba(15,23,42,0.4)]">
+                                <div className="w-full h-0.5 bg-rose-500 shadow-[0_0_8px_#f43f5e] animate-[bounce_2s_infinite]" />
+                              </div>
+                            </div>
+                          )}
+
+                          {addCameraError && (
+                            <div className="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center text-rose-200 p-3 text-center gap-2 overflow-y-auto w-full h-full">
+                              <p className="text-xs font-black text-rose-450">ระบบกล้องไม่ตอบรับ</p>
+                              <p className="text-[10px] text-rose-300 max-w-xs whitespace-pre-line text-left bg-rose-950/40 p-2.5 rounded-xl border border-rose-900/30">{addCameraError}</p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nativeBtn = document.getElementById("category-native-camera-input");
+                                  if (nativeBtn) (nativeBtn as HTMLInputElement).click();
+                                }}
+                                className="mt-1 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[11px] py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-transform pointer-events-auto cursor-pointer"
+                              >
+                                <Scan size={14} />
+                                <span>เปิดกล้องมือถือถ่ายตรง (แก้ขัด)</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Add Item custom capture tools bar */}
+                        <div className="space-y-2 mb-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={handleAddCaptureFrame}
+                              className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black py-2.5 px-3 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer border border-indigo-500"
+                            >
+                              <Camera size={13} className="animate-bounce" />
+                              <span>กดถ่ายรูปตรวจจับ</span>
+                            </button>
+
+                            <label className="flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-black py-2.5 px-3 rounded-xl border border-slate-200 shadow-sm transition-all active:scale-95 cursor-pointer relative">
+                              <Scan size={13} className="text-indigo-600" />
+                              <span>ถ่ายกล้องมือถือตรง</span>
+                              <input
+                                id="category-native-camera-input"
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                onChange={handleAddFileScan}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                              />
+                            </label>
+                          </div>
+
+                          <p className="text-[9px] font-medium text-slate-400 text-center leading-normal">
+                            💡 คำแนะนำ: หากวิดีโอสดตรวจบาร์โค้ดไม่ขึ้น ให้กด <span className="font-bold text-indigo-600">"ถ่ายกล้องมือถือตรง"</span> ถ่ายภาพระยะใกล้ ภาพคมชัดเต็มพิกเซลจะอ่านแม่นยำ 100%!
+                          </p>
+
+                          {/* Invisible files reader target element for Category view */}
+                          <div id="hidden-category-file-scanner" className="absolute opacity-0 pointer-events-none w-0 h-0 overflow-hidden" />
+                        </div>
+                      </>
+                    )}
+
+                    <div className="relative">
+                      <input
+                        ref={addItemBarcodeRef}
+                        type="text"
+                        placeholder="สแกน หรือเว้นว่างเพื่อให้ระบบสร้างรหัสให้อัตโนมัติ (เช่น M008)..."
+                        value={newId}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const cleaned = isAddNumericOnly ? extractBarcodeDigits(val) : normalizeBarcode(val);
+                          setNewId(cleaned);
+                          setAddError('');
+                        }}
+                        onPaste={(e) => {
+                          e.preventDefault();
+                          const pasted = e.clipboardData.getData('text');
+                          const cleaned = isAddNumericOnly ? extractBarcodeDigits(pasted) : normalizeBarcode(pasted);
+                          setNewId(cleaned);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (newItemNameRef.current) {
+                              newItemNameRef.current.focus();
+                            }
+                          }
+                        }}
+                        className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-300 font-bold tracking-wider"
+                      />
+
+                      {newId && (
+                        <button
+                          type="button"
+                          onClick={() => setNewId('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full text-xs font-bold"
+                          title="ล้างค่า"
+                        >
+                          ✕
                         </button>
                       )}
                     </div>
 
-                    {addCameraLoading && (
-                      <div className="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center text-white gap-2 p-4 text-center">
-                        <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                        <p className="text-[10px] font-bold text-indigo-200">กำลังเชื่อมต่อภาพสดกล้อง...</p>
-                      </div>
-                    )}
-
-                    {!addCameraLoading && !addCameraError && (
-                      <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
-                        <div className="w-[85%] h-[55%] border-2 border-indigo-400 rounded-xl relative flex flex-col justify-between items-center shadow-[0_0_0_1000px_rgba(15,23,42,0.4)]">
-                          <div className="w-full h-0.5 bg-rose-500 shadow-[0_0_8px_#f43f5e] animate-[bounce_2s_infinite]" />
+                    {/* Instant Helper Pill if Thai script is ever detected in input */}
+                    {containsThai(newId) && (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-2 animate-fadeIn">
+                        <div className="flex items-center gap-1.5 text-amber-800 font-bold">
+                          <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                          <span>ตรวจพบแป้นพิมพ์ไทยจากเครื่องสแกนบาร์โค้ด</span>
+                        </div>
+                        <p className="text-[11px] text-amber-700">
+                          เครื่องพิมพ์ออกมาเป็น: <code className="bg-amber-100/70 px-1 py-0.5 rounded font-mono text-amber-900 font-bold">{newId}</code>
+                        </p>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setNewId(normalizeBarcode(newId))}
+                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-sm flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+                          >
+                            <span>✅ แปลงเป็น:</span>
+                            <span className="font-mono bg-white/20 px-1.5 py-0.5 rounded text-white">{normalizeBarcode(newId)}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNewId(extractBarcodeDigits(newId))}
+                            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs shadow-sm flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+                          >
+                            <span>🔢 ตัวเลขล้วน:</span>
+                            <span className="font-mono bg-white/20 px-1.5 py-0.5 rounded text-white">{extractBarcodeDigits(newId)}</span>
+                          </button>
                         </div>
                       </div>
                     )}
 
-                    {addCameraError && (
-                      <div className="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center text-rose-200 p-3 text-center gap-2 overflow-y-auto w-full h-full">
-                        <p className="text-xs font-black text-rose-450">ระบบกล้องไม่ตอบรับ</p>
-                        <p className="text-[10px] text-rose-300 max-w-xs whitespace-pre-line text-left bg-rose-950/40 p-2.5 rounded-xl border border-rose-900/30">{addCameraError}</p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const nativeBtn = document.getElementById("category-native-camera-input");
-                            if (nativeBtn) (nativeBtn as HTMLInputElement).click();
-                          }}
-                          className="mt-1 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[11px] py-2 px-3 rounded-xl flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-transform pointer-events-auto cursor-pointer"
-                        >
-                          <Scan size={14} />
-                          <span>เปิดกล้องมือถือถ่ายตรง (แก้ขัด)</span>
-                        </button>
+                    {/* GS1 Barcode Information Banner */}
+                    {parsedAddGS1.isGS1 && parsedAddGS1.gtin && (
+                      <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs space-y-2 animate-fadeIn">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-indigo-900 flex items-center gap-1.5">
+                            <Sparkles size={14} className="text-indigo-600" />
+                            <span>ตรวจพบบาร์โค้ดยา/เวชภัณฑ์มาตรฐาน GS1</span>
+                          </span>
+                          {newId !== parsedAddGS1.gtin && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewId(parsedAddGS1.gtin!);
+                              }}
+                              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold shadow-xs cursor-pointer active:scale-95 transition-all"
+                              title="ตัดเอาเฉพาะรหัสสินค้าสากล EAN-13"
+                            >
+                              ✂️ ใช้เฉพาะรหัสสินค้า ({parsedAddGS1.gtin})
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[11px] text-indigo-900 bg-white/60 p-2 rounded-lg border border-indigo-100">
+                          <div>รหัสสินค้า (GTIN): <span className="font-mono font-bold text-indigo-700">{parsedAddGS1.gtin}</span></div>
+                          <div>วันหมดอายุ: <span className="font-mono font-bold text-indigo-700">{parsedAddGS1.expiryDate || '-'}</span></div>
+                          {parsedAddGS1.lotNumber && (
+                            <div className="col-span-2">ล็อตสินค้า: <span className="font-mono font-bold text-indigo-700">{parsedAddGS1.lotNumber}</span></div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Found Existing Item Match Notification */}
+                    {matchedExistingItem && (
+                      <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs space-y-1.5 animate-fadeIn">
+                        <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
+                          <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                          <span>ตรวจพบบาร์โค้ดนี้ตรงกับสินค้าในระบบแล้ว ({matchedExistingItem.id})</span>
+                        </div>
+                        <p className="text-[12px] text-emerald-950 font-medium">
+                          ชื่อสินค้า: <span className="font-bold underline">{matchedExistingItem.name}</span> (คงเหลือเดิม: <span className="font-bold">{matchedExistingItem.quantity}</span> {matchedExistingItem.unit})
+                        </p>
+                        <p className="text-[11px] text-emerald-700 leading-relaxed">
+                          💡 <strong>ระบบดึงชื่อสินค้าและรวมสต็อกอัตโนมัติ:</strong> เมื่อกดบันทึก จำนวน <span className="font-bold font-mono">+{newQty} {newUnit || matchedExistingItem.unit}</span> จะถูกนำไปบวกเพิ่มเข้ากับสินค้าเดิม และบันทึกเป็นล็อตใหม่ให้ทันที
+                        </p>
                       </div>
                     )}
                   </div>
 
-                  {/* Add Item custom capture tools bar */}
-                  <div className="space-y-2 mt-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={handleAddCaptureFrame}
-                        className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black py-2.5 px-3 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer border border-indigo-500"
-                      >
-                        <Camera size={13} className="animate-bounce" />
-                        <span>กดถ่ายรูปตรวจจับ</span>
-                      </button>
-
-                      <label className="flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-black py-2.5 px-3 rounded-xl border border-slate-200 shadow-sm transition-all active:scale-95 cursor-pointer relative">
-                        <Scan size={13} className="text-indigo-600" />
-                        <span>ถ่ายกล้องมือถือตรง</span>
-                        <input
-                          id="category-native-camera-input"
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          onChange={handleAddFileScan}
-                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                        />
-                      </label>
+                  {/* Product Name Field in Column 1 */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-550 block">ชื่อรายการสินค้า</label>
+                      {matchedExistingItem && (
+                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1 animate-fadeIn">
+                          <Check size={11} />
+                          <span>ดึงชื่อตรงจากบาร์โค้ดแล้ว</span>
+                        </span>
+                      )}
                     </div>
-
-                    <p className="text-[9px] font-medium text-slate-400 text-center leading-normal">
-                      💡 คำแนะนำ: หากวิดีโอสดตรวจบาร์โค้ดไม่ขึ้น ให้กด <span className="font-bold text-indigo-600">"ถ่ายกล้องมือถือตรง"</span> ถ่ายภาพระยะใกล้ ภาพคมชัดเต็มพิกเซลจะอ่านแม่นยำ 100%!
-                    </p>
-
-                    {/* Invisible files reader target element for Category view */}
-                    <div id="hidden-category-file-scanner" className="absolute opacity-0 pointer-events-none w-0 h-0 overflow-hidden" />
-                  </div>
-                </>
-              )}
-
-                  <div className="relative">
                     <input
-                      ref={addItemBarcodeRef}
+                      ref={newItemNameRef}
                       type="text"
-                      placeholder="สแกน หรือเว้นว่างเพื่อให้ระบบสร้างรหัสให้อัตโนมัติ (เช่น M008)..."
-                      value={newId}
+                      required
+                      list="category-product-names"
+                      placeholder="ระบุชื่อสินค้า หรือเลือกจากรายการที่มีอยู่..."
+                      value={newName}
                       onChange={(e) => {
-                        const val = e.target.value;
-                        const cleaned = isAddNumericOnly ? extractBarcodeDigits(val) : normalizeBarcode(val);
-                        setNewId(cleaned);
+                        setNewName(e.target.value);
                         setAddError('');
-                      }}
-                      onPaste={(e) => {
-                        e.preventDefault();
-                        const pasted = e.clipboardData.getData('text');
-                        const cleaned = isAddNumericOnly ? extractBarcodeDigits(pasted) : normalizeBarcode(pasted);
-                        setNewId(cleaned);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          if (newItemNameRef.current) {
-                            newItemNameRef.current.focus();
-                          }
+                        const selectedItem = items.find(i => i.name.toLowerCase() === e.target.value.trim().toLowerCase());
+                        if (selectedItem) {
+                          if (!newId.trim()) setNewId(selectedItem.id);
+                          if (selectedItem.unit) setNewUnit(selectedItem.unit);
+                          if (selectedItem.minStock !== undefined) setNewMinStock(selectedItem.minStock);
+                          if (selectedItem.maxStock !== undefined) setNewMaxStock(selectedItem.maxStock);
                         }
                       }}
-                      className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-300 font-bold tracking-wider"
+                      className={`w-full bg-slate-50 border px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 font-bold transition-all ${
+                        matchedExistingItem ? 'border-emerald-300 bg-emerald-50/20 text-emerald-950' : 'border-slate-200'
+                      }`}
                     />
+                    <datalist id="category-product-names">
+                      {items.map(i => (
+                        <option key={i.id} value={i.name}>
+                          {i.id} - คงเหลือ {i.quantity} {i.unit}
+                        </option>
+                      ))}
+                    </datalist>
+                  </div>
+                </div>
 
-                    {newId && (
-                      <button
-                        type="button"
-                        onClick={() => setNewId('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full text-xs font-bold"
-                        title="ล้างค่า"
-                      >
-                        ✕
-                      </button>
-                    )}
+                {/* Column 2: Inventory, Lots, Min-Max & Notes */}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-550 block">จำนวน</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={newQty}
+                        onChange={(e) => setNewQty(parseInt(e.target.value) || 0)}
+                        onFocus={(e) => e.target.select()}
+                        className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-center font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+                      />
+                    </div>
+
+                    <UnitSelector
+                      value={newUnit}
+                      onChange={(u) => setNewUnit(u)}
+                      label="หน่วยนับ"
+                      selectClassName="bg-slate-50 border-slate-200 focus:ring-rose-500/20"
+                    />
                   </div>
 
-                  {/* Instant Helper Pill if Thai script is ever detected in input */}
-                  {containsThai(newId) && (
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-2 animate-fadeIn">
-                      <div className="flex items-center gap-1.5 text-amber-800 font-bold">
-                        <AlertTriangle size={14} className="text-amber-600 shrink-0" />
-                        <span>ตรวจพบแป้นพิมพ์ไทยจากเครื่องสแกนบาร์โค้ด</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-550 block">หมายเลขล็อต (Lot / Batch No.)</label>
+                      <input
+                        type="text"
+                        placeholder="เช่น LOT-6701 หรือ B2408 (เว้นว่างได้)"
+                        value={newLot}
+                        onChange={(e) => setNewLot(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-slate-700"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-550 block">วันหมดอายุของล็อตนี้ (Expiry Date)</label>
+                      <input
+                        type="date"
+                        value={newExpiry}
+                        onChange={(e) => setNewExpiry(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-slate-700"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Min & Max Stock Threshold Configuration */}
+                  <div className="bg-slate-50/90 p-3.5 rounded-2xl border border-slate-200/90 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+                        <SlidersHorizontal size={13} className="text-indigo-600" />
+                        <span>กำหนดเกณฑ์สต็อก Min - Max (การแจ้งเตือน)</span>
+                      </span>
+                      <span className="text-[10px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full font-bold">
+                        ตั้งค่าได้อิสระ
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-amber-700 block">
+                          📉 สต็อกต่ำสุด (Min Stock)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={newMinStock}
+                          onChange={(e) => setNewMinStock(parseInt(e.target.value) || 0)}
+                          className="w-full bg-white border border-amber-200 px-3 py-2 rounded-xl text-xs font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                        />
+                        <span className="text-[10px] text-slate-400 block">เตือนเมื่อ ≤ ค่านึ้ (สั่งซื้อเพิ่ม)</span>
                       </div>
-                      <p className="text-[11px] text-amber-700">
-                        เครื่องพิมพ์ออกมาเป็น: <code className="bg-amber-100/70 px-1 py-0.5 rounded font-mono text-amber-900 font-bold">{newId}</code>
-                      </p>
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => setNewId(normalizeBarcode(newId))}
-                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-sm flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
-                        >
-                          <span>✅ แปลงเป็น:</span>
-                          <span className="font-mono bg-white/20 px-1.5 py-0.5 rounded text-white">{normalizeBarcode(newId)}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setNewId(extractBarcodeDigits(newId))}
-                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs shadow-sm flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
-                        >
-                          <span>🔢 ตัวเลขล้วน:</span>
-                          <span className="font-mono bg-white/20 px-1.5 py-0.5 rounded text-white">{extractBarcodeDigits(newId)}</span>
-                        </button>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-sky-700 block">
+                          📈 สต็อกสูงสุด (Max Stock)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={newMaxStock}
+                          onChange={(e) => setNewMaxStock(parseInt(e.target.value) || 1)}
+                          className="w-full bg-white border border-sky-200 px-3 py-2 rounded-xl text-xs font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                        />
+                        <span className="text-[10px] text-slate-400 block">เตือนเมื่อ &gt; ค่านึ้ (สต็อกเกิน)</span>
                       </div>
                     </div>
-                  )}
+                  </div>
 
-                  {/* Found Existing Item Match Notification */}
-                  {matchedExistingItem && (
-                    <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs space-y-1.5 animate-fadeIn">
-                      <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
-                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                        <span>ตรวจพบบาร์โค้ดนี้ในระบบแล้ว ({matchedExistingItem.id})</span>
-                      </div>
-                      <p className="text-[12px] text-emerald-950 font-medium">
-                        ชื่อสินค้า: <span className="font-bold underline">{matchedExistingItem.name}</span> (คงเหลือเดิม: <span className="font-bold">{matchedExistingItem.quantity}</span> {matchedExistingItem.unit})
-                      </p>
-                      <p className="text-[11px] text-emerald-700 leading-relaxed">
-                        💡 <strong>ระบบจะรวมสต็อกอัตโนมัติ:</strong> เมื่อกดบันทึก จำนวน <span className="font-bold font-mono">+{newQty} {newUnit || matchedExistingItem.unit}</span> จะถูกนำไปบวกเพิ่มเข้ากับสินค้าเดิม และบันทึกเป็นล็อตใหม่ให้ทันที
-                      </p>
+                  {/* Guidance for Multiple Lots / Different Expiry Dates */}
+                  <div className="p-3 bg-indigo-50/70 rounded-xl border border-indigo-150 text-xs text-indigo-950 space-y-1">
+                    <div className="font-bold flex items-center gap-1.5 text-indigo-800">
+                      <Tag size={13} className="text-indigo-600" />
+                      <span>คำแนะนำ: หากมีหลายล็อต และวันหมดอายุไม่เท่ากัน</span>
                     </div>
-                  )}
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-550 block">ชื่อรายการสินค้า</label>
-                <input
-                  ref={newItemNameRef}
-                  type="text"
-                  required
-                  placeholder="ระบุชื่อสินค้า..."
-                  value={newName}
-                  onChange={(e) => {
-                    setNewName(e.target.value);
-                    setAddError('');
-                  }}
-                  className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-550 block">จำนวน</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={newQty}
-                    onChange={(e) => setNewQty(parseInt(e.target.value) || 0)}
-                    onFocus={(e) => e.target.select()}
-                    className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-center font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500/20"
-                  />
-                </div>
-
-                <UnitSelector
-                  value={newUnit}
-                  onChange={(u) => setNewUnit(u)}
-                  label="หน่วยนับ"
-                  selectClassName="bg-slate-50 border-slate-200 focus:ring-rose-500/20"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-550 block">หมายเลขล็อต (Lot / Batch No.)</label>
-                  <input
-                    type="text"
-                    placeholder="เช่น LOT-6701 หรือ B2408 (เว้นว่างได้)"
-                    value={newLot}
-                    onChange={(e) => setNewLot(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-slate-700"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-550 block">วันหมดอายุของล็อตนี้ (Expiry Date)</label>
-                  <input
-                    type="date"
-                    value={newExpiry}
-                    onChange={(e) => setNewExpiry(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-slate-700"
-                  />
-                </div>
-              </div>
-
-              {/* Min & Max Stock Threshold Configuration */}
-              <div className="bg-slate-50/90 p-3.5 rounded-2xl border border-slate-200/90 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-slate-700 flex items-center gap-1.5">
-                    <SlidersHorizontal size={13} className="text-indigo-600" />
-                    <span>กำหนดเกณฑ์สต็อก Min - Max (การแจ้งเตือน)</span>
-                  </span>
-                  <span className="text-[10px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full font-bold">
-                    ตั้งค่าได้อิสระ
-                  </span>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-amber-700 block">
-                      📉 สต็อกต่ำสุด (Min Stock)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={newMinStock}
-                      onChange={(e) => setNewMinStock(parseInt(e.target.value) || 0)}
-                      className="w-full bg-white border border-amber-200 px-3 py-2 rounded-xl text-xs font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-200"
-                    />
-                    <span className="text-[10px] text-slate-400 block">เตือนเมื่อ ≤ ค่านึ้ (สั่งซื้อเพิ่ม)</span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-sky-700 block">
-                      📈 สต็อกสูงสุด (Max Stock)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={newMaxStock}
-                      onChange={(e) => setNewMaxStock(parseInt(e.target.value) || 1)}
-                      className="w-full bg-white border border-sky-200 px-3 py-2 rounded-xl text-xs font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                    />
-                    <span className="text-[10px] text-slate-400 block">เตือนเมื่อ &gt; ค่านึ้ (สต็อกเกิน)</span>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      สามารถกรอกล็อตแรกเพื่อลงทะเบียนก่อนได้เลยครับ และเมื่อได้รับล็อตใหม่ที่มีวันหมดอายุต่างกันในครั้งถัดไป ให้กดปุ่ม <strong>"รับเข้า"</strong> แล้วระบุวันหมดอายุของล็อตใหม่นั้นได้ทันที ระบบจะแยกติดตามทุกล็อตและคำนวณยอดรวมให้อัตโนมัติครับ
+                    </p>
                   </div>
                 </div>
+
               </div>
 
-              {/* Guidance for Multiple Lots / Different Expiry Dates */}
-              <div className="p-3 bg-indigo-50/70 rounded-xl border border-indigo-150 text-xs text-indigo-950 space-y-1">
-                <div className="font-bold flex items-center gap-1.5 text-indigo-800">
-                  <Tag size={13} className="text-indigo-600" />
-                  <span>คำแนะนำ: หากมีหลายล็อต และวันหมดอายุไม่เท่ากัน</span>
-                </div>
-                <p className="text-[11px] text-slate-600 leading-relaxed">
-                  สามารถกรอกล็อตแรกเพื่อลงทะเบียนก่อนได้เลยครับ และเมื่อได้รับล็อตใหม่ที่มีวันหมดอายุต่างกันในครั้งถัดไป ให้กดปุ่ม <strong>"รับเข้า"</strong> แล้วระบุวันหมดอายุของล็อตใหม่นั้นได้ทันที ระบบจะแยกติดตามทุกล็อตและคำนวณยอดรวมให้อัตโนมัติครับ
-                </p>
-              </div>
-
-              <div className="pt-4 flex gap-3">
+              {/* Action Buttons */}
+              <div className="pt-4 border-t border-slate-100 flex gap-3">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-250 text-slate-650 font-bold rounded-xl transition-all"
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all cursor-pointer"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl transition-all shadow-md shadow-rose-100 flex items-center justify-center gap-1.5"
+                  className="flex-1 py-3 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl transition-all shadow-md shadow-rose-200 flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Save size={18} />
                   <span>บันทึกข้อมูลทั่วไป</span>
@@ -2456,16 +2539,16 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
 
       {/* -------------------- MODAL: EDIT ITEM & CONFIGURE MIN-MAX THRESHOLDS -------------------- */}
       {isDirectEditModalOpen && directEditItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
-            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/70">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden transform transition-all">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70 flex-shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
                   <SlidersHorizontal size={20} />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-slate-850">กำหนดเกณฑ์ Min - Max & ข้อมูลสินค้า</h3>
-                  <p className="text-xs text-slate-400 font-mono">รหัสสินค้า: {directEditItem.id}</p>
+                  <h3 className="text-base md:text-lg font-black text-slate-850">กำหนดเกณฑ์ Min - Max & ข้อมูลสินค้า</h3>
+                  <p className="text-xs text-slate-400 font-mono">รหัสสินค้าเดิม: {directEditItem.id}</p>
                 </div>
               </div>
               <button 
@@ -2479,235 +2562,243 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
               </button>
             </div>
             
-            <form onSubmit={handleDirectEdit} className="p-6 space-y-4">
-              {/* Barcode / SKU editable field */}
-              <div className="space-y-1.5 bg-indigo-50/50 p-3.5 rounded-2xl border border-indigo-100">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-black text-indigo-900 flex items-center gap-1.5">
-                    <Tag size={13} className="text-indigo-600" />
-                    <span>รหัสบาร์โค้ด / รหัสสินค้า (Barcode / SKU)</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const prefix = (categoryId ? categoryId.substring(0, 3) : 'SKU').toUpperCase();
-                      setDirectEditBarcode(`${prefix}-${Math.floor(100000 + Math.random() * 900000)}`);
-                    }}
-                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer"
-                    title="สุ่มสร้างรหัสบาร์โค้ดใหม่"
-                  >
-                    <Zap size={11} />
-                    <span>สุ่มสร้างรหัส</span>
-                  </button>
-                </div>
+            <form onSubmit={handleDirectEdit} className="flex-1 overflow-y-auto p-5 md:p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+                {/* Column 1: Barcode & Product Name */}
+                <div className="space-y-4">
+                  {/* Barcode / SKU editable field */}
+                  <div className="space-y-1.5 bg-indigo-50/50 p-3.5 rounded-2xl border border-indigo-100">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black text-indigo-900 flex items-center gap-1.5">
+                        <Tag size={13} className="text-indigo-600" />
+                        <span>รหัสบาร์โค้ด / รหัสสินค้า</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const prefix = (categoryId ? categoryId.substring(0, 3) : 'SKU').toUpperCase();
+                          setDirectEditBarcode(`${prefix}-${Math.floor(100000 + Math.random() * 900000)}`);
+                        }}
+                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer"
+                        title="สุ่มสร้างรหัสบาร์โค้ดใหม่"
+                      >
+                        <Zap size={11} />
+                        <span>สุ่มสร้างรหัส</span>
+                      </button>
+                    </div>
 
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    value={directEditBarcode}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const cleaned = isDirectBarcodeNumericOnly ? extractBarcodeDigits(val) : normalizeBarcode(val);
-                      setDirectEditBarcode(cleaned || val);
-                      setDirectBarcodeError('');
-                    }}
-                    onPaste={(e) => {
-                      e.preventDefault();
-                      const pasted = e.clipboardData.getData('text');
-                      const cleaned = isDirectBarcodeNumericOnly ? extractBarcodeDigits(pasted) : normalizeBarcode(pasted);
-                      setDirectEditBarcode(cleaned || pasted);
-                    }}
-                    placeholder="ยิงบาร์โค้ดใหม่ หรือแก้ไขตัวเลข..."
-                    className="w-full bg-white border border-indigo-200 px-3.5 py-2.5 rounded-xl font-mono text-sm font-black text-slate-800 tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  />
-                  {directEditBarcode && directEditBarcode !== directEditItem.id && (
-                    <button
-                      type="button"
-                      onClick={() => setDirectEditBarcode(directEditItem.id)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 hover:text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md cursor-pointer"
-                      title="คืนค่าเป็นรหัสเดิม"
-                    >
-                      คืนค่าเดิม
-                    </button>
-                  )}
-                </div>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        required
+                        value={directEditBarcode}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const cleaned = isDirectBarcodeNumericOnly ? extractBarcodeDigits(val) : normalizeBarcode(val);
+                          setDirectEditBarcode(cleaned || val);
+                          setDirectBarcodeError('');
+                        }}
+                        onPaste={(e) => {
+                          e.preventDefault();
+                          const pasted = e.clipboardData.getData('text');
+                          const cleaned = isDirectBarcodeNumericOnly ? extractBarcodeDigits(pasted) : normalizeBarcode(pasted);
+                          setDirectEditBarcode(cleaned || pasted);
+                        }}
+                        placeholder="ยิงบาร์โค้ดใหม่ หรือแก้ไขตัวเลข..."
+                        className="w-full bg-white border border-indigo-200 px-3.5 py-2.5 rounded-xl font-mono text-sm font-black text-slate-800 tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                      />
+                      {directEditBarcode && directEditBarcode !== directEditItem.id && (
+                        <button
+                          type="button"
+                          onClick={() => setDirectEditBarcode(directEditItem.id)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 hover:text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md cursor-pointer"
+                          title="คืนค่าเป็นรหัสเดิม"
+                        >
+                          คืนค่าเดิม
+                        </button>
+                      )}
+                    </div>
 
-                {/* Helper buttons for barcode conversion */}
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setIsDirectBarcodeNumericOnly(!isDirectBarcodeNumericOnly)}
-                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border cursor-pointer ${
-                      isDirectBarcodeNumericOnly
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    🔢 {isDirectBarcodeNumericOnly ? 'โหมดตัวเลขล้วน (เปิด)' : 'โหมดตัวเลขล้วน (ปิด)'}
-                  </button>
+                    {/* Helper buttons for barcode conversion */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsDirectBarcodeNumericOnly(!isDirectBarcodeNumericOnly)}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border cursor-pointer ${
+                          isDirectBarcodeNumericOnly
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        🔢 {isDirectBarcodeNumericOnly ? 'โหมดตัวเลขล้วน (เปิด)' : 'โหมดตัวเลขล้วน (ปิด)'}
+                      </button>
 
-                  {containsThai(directEditBarcode) && (
-                    <button
-                      type="button"
-                      onClick={() => setDirectEditBarcode(normalizeBarcode(directEditBarcode))}
-                      className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-bold shadow-xs flex items-center gap-1 cursor-pointer"
-                    >
-                      <span>🔄 แปลงแป้นไทย:</span>
-                      <span className="font-mono bg-white/20 px-1 rounded">{normalizeBarcode(directEditBarcode)}</span>
-                    </button>
-                  )}
-                </div>
+                      {containsThai(directEditBarcode) && (
+                        <button
+                          type="button"
+                          onClick={() => setDirectEditBarcode(normalizeBarcode(directEditBarcode))}
+                          className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[10px] font-bold shadow-xs flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>🔄 แปลงแป้นไทย:</span>
+                          <span className="font-mono bg-white/20 px-1 rounded">{normalizeBarcode(directEditBarcode)}</span>
+                        </button>
+                      )}
+                    </div>
 
-                {directEditBarcode.trim() && directEditBarcode.trim() !== directEditItem.id && (
-                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 space-y-1 animate-fadeIn">
-                    <p className="font-bold flex items-center gap-1">
-                      <AlertTriangle size={13} className="text-amber-600 shrink-0" />
-                      <span>คุณกำลังแก้ไขรหัสจาก "{directEditItem.id}" เป็น "{directEditBarcode.trim()}"</span>
-                    </p>
-                    <p className="text-[10px] text-amber-700">
-                      ประวัติการรับเข้า-เบิกจ่ายทั้งหมดจะถูกย้ายมาเชื่อมกับรหัสบาร์โค้ดใหม่นี้โดยอัตโนมัติ
-                    </p>
+                    {directEditBarcode.trim() && directEditBarcode.trim() !== directEditItem.id && (
+                      <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 space-y-1 animate-fadeIn">
+                        <p className="font-bold flex items-center gap-1">
+                          <AlertTriangle size={13} className="text-amber-600 shrink-0" />
+                          <span>คุณกำลังแก้ไขรหัสจาก "{directEditItem.id}" เป็น "{directEditBarcode.trim()}"</span>
+                        </p>
+                        <p className="text-[10px] text-amber-700">
+                          ประวัติการรับเข้า-เบิกจ่ายทั้งหมดจะถูกย้ายมาเชื่อมกับรหัสบาร์โค้ดใหม่นี้โดยอัตโนมัติ
+                        </p>
+                      </div>
+                    )}
+
+                    {editBarcodeCollision && (
+                      <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-[11px] text-rose-800 space-y-1 animate-fadeIn">
+                        <p className="font-bold flex items-center gap-1">
+                          <AlertTriangle size={13} className="text-rose-600 shrink-0" />
+                          <span>บาร์โค้ดนี้ตรงกับสินค้า "{editBarcodeCollision.name}" ในระบบแล้ว!</span>
+                        </p>
+                        <p className="text-[10px] text-rose-700">
+                          หากกดบันทึก ระบบจะรวมยอดคงเหลือและล็อตของทั้ง 2 รายการเข้าด้วยกันอัตโนมัติ
+                        </p>
+                      </div>
+                    )}
+
+                    {directBarcodeError && (
+                      <p className="text-xs text-rose-600 font-bold">{directBarcodeError}</p>
+                    )}
                   </div>
-                )}
 
-                {editBarcodeCollision && (
-                  <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-[11px] text-rose-800 space-y-1 animate-fadeIn">
-                    <p className="font-bold flex items-center gap-1">
-                      <AlertTriangle size={13} className="text-rose-600 shrink-0" />
-                      <span>บาร์โค้ดนี้ตรงกับสินค้า "{editBarcodeCollision.name}" ในระบบแล้ว!</span>
-                    </p>
-                    <p className="text-[10px] text-rose-700">
-                      หากกดบันทึก ระบบจะรวมยอดคงเหลือและล็อตของทั้ง 2 รายการเข้าด้วยกันอัตโนมัติ
-                    </p>
-                  </div>
-                )}
-
-                {directBarcodeError && (
-                  <p className="text-xs text-rose-600 font-bold">{directBarcodeError}</p>
-                )}
-              </div>
-
-              {/* Product Name */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-600 block">ชื่อรายการสินค้า</label>
-                <input
-                  type="text"
-                  required
-                  value={directEditName}
-                  onChange={(e) => setDirectEditName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                />
-              </div>
-
-              {/* Quantity & Unit in Grid */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-600 block">ยอดคงเหลือสุทธิ</label>
-                  <input
-                    type="number"
-                    min="0"
-                    required
-                    value={directEditQty}
-                    onChange={(e) => setDirectEditQty(parseInt(e.target.value) || 0)}
-                    onFocus={(e) => e.target.select()}
-                    className="w-full text-center bg-slate-50 border border-slate-200 focus:border-indigo-500 text-slate-800 px-3 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200 font-black text-lg transition-all"
-                  />
-                </div>
-
-                <UnitSelector
-                  value={directEditUnit}
-                  onChange={(u) => setDirectEditUnit(u)}
-                  label="หน่วยนับ"
-                  selectClassName="bg-slate-50 border-slate-200 focus:ring-indigo-200 py-3"
-                />
-              </div>
-
-              {/* Min & Max Stock Inputs */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/90 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                    <Target size={14} className="text-indigo-600" />
-                    <span>ตั้งค่าระดับเกณฑ์สต็อก (Min - Max Thresholds)</span>
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-amber-800 block">
-                      📉 เกณฑ์ต่ำสุด (Min Stock)
-                    </label>
+                  {/* Product Name */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-600 block">ชื่อรายการสินค้า</label>
                     <input
-                      type="number"
-                      min="0"
+                      type="text"
                       required
-                      value={directEditMinStock}
-                      onChange={(e) => setDirectEditMinStock(parseInt(e.target.value) || 0)}
-                      className="w-full bg-white border border-amber-300 px-3 py-2 rounded-xl text-center text-sm font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                      value={directEditName}
+                      onChange={(e) => setDirectEditName(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-200"
                     />
-                    <span className="text-[10px] text-slate-500 block">เตือนสต็อกต่ำเมื่อ ≤ ค่านี้</span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-sky-800 block">
-                      📈 เกณฑ์สูงสุด (Max Stock)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      value={directEditMaxStock}
-                      onChange={(e) => setDirectEditMaxStock(parseInt(e.target.value) || 1)}
-                      className="w-full bg-white border border-sky-300 px-3 py-2 rounded-xl text-center text-sm font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                    />
-                    <span className="text-[10px] text-slate-500 block">เตือนสต็อกเกินเมื่อ &gt; ค่านี้</span>
                   </div>
                 </div>
 
-                {/* Visual Stock Level Indicator / Gauge */}
-                <div className="pt-2 border-t border-slate-200/80 space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px] font-bold">
-                    <span className="text-slate-500">สถานะที่คำนวณได้:</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                      directEditQty === 0 ? 'bg-rose-100 text-rose-700' :
-                      directEditQty <= directEditMinStock ? 'bg-amber-100 text-amber-800' :
-                      directEditQty > directEditMaxStock ? 'bg-sky-100 text-sky-800' :
-                      'bg-emerald-100 text-emerald-800'
-                    }`}>
-                      {directEditQty === 0 ? '❌ สินค้าหมด (0)' :
-                       directEditQty <= directEditMinStock ? `⚠️ สต็อกต่ำ (≤${directEditMinStock})` :
-                       directEditQty > directEditMaxStock ? `📦 สต็อกเกิน (>${directEditMaxStock})` :
-                       '✅ สต็อกพร้อมใช้ (พอดี)'}
-                    </span>
+                {/* Column 2: Quantity, Unit, Min-Max & Gauge */}
+                <div className="space-y-4">
+                  {/* Quantity & Unit in Grid */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-600 block">ยอดคงเหลือสุทธิ</label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        value={directEditQty}
+                        onChange={(e) => setDirectEditQty(parseInt(e.target.value) || 0)}
+                        onFocus={(e) => e.target.select()}
+                        className="w-full text-center bg-slate-50 border border-slate-200 focus:border-indigo-500 text-slate-800 px-3 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200 font-black text-lg transition-all"
+                      />
+                    </div>
+
+                    <UnitSelector
+                      value={directEditUnit}
+                      onChange={(u) => setDirectEditUnit(u)}
+                      label="หน่วยนับ"
+                      selectClassName="bg-slate-50 border-slate-200 focus:ring-indigo-200 py-3"
+                    />
                   </div>
 
-                  <div className="relative w-full h-3 bg-slate-200 rounded-full overflow-hidden flex">
-                    {/* Red zone: 0 to Min */}
-                    <div 
-                      className="h-full bg-amber-400" 
-                      style={{ width: `${Math.min(100, (directEditMinStock / Math.max(1, directEditMaxStock * 1.2)) * 100)}%` }} 
-                      title="โซนสต็อกต่ำ"
-                    />
-                    {/* Green zone: Min to Max */}
-                    <div 
-                      className="h-full bg-emerald-400 flex-1" 
-                      title="โซนสต็อกเหมาะสม"
-                    />
-                    {/* Blue zone: > Max */}
-                    <div 
-                      className="h-full bg-sky-400 w-6" 
-                      title="โซนสต็อกเกิน"
-                    />
-                  </div>
-                  <div className="flex justify-between text-[9px] text-slate-400 font-mono">
-                    <span>0</span>
-                    <span className="text-amber-700 font-bold">Min ({directEditMinStock})</span>
-                    <span className="text-sky-700 font-bold">Max ({directEditMaxStock})</span>
+                  {/* Min & Max Stock Inputs */}
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/90 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                        <Target size={14} className="text-indigo-600" />
+                        <span>ตั้งค่าระดับเกณฑ์สต็อก (Min - Max Thresholds)</span>
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-amber-800 block">
+                          📉 เกณฑ์ต่ำสุด (Min Stock)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          required
+                          value={directEditMinStock}
+                          onChange={(e) => setDirectEditMinStock(parseInt(e.target.value) || 0)}
+                          className="w-full bg-white border border-amber-300 px-3 py-2 rounded-xl text-center text-sm font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-200"
+                        />
+                        <span className="text-[10px] text-slate-500 block">เตือนสต็อกต่ำเมื่อ ≤ ค่านี้</span>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-sky-800 block">
+                          📈 เกณฑ์สูงสุด (Max Stock)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={directEditMaxStock}
+                          onChange={(e) => setDirectEditMaxStock(parseInt(e.target.value) || 1)}
+                          className="w-full bg-white border border-sky-300 px-3 py-2 rounded-xl text-center text-sm font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                        />
+                        <span className="text-[10px] text-slate-500 block">เตือนสต็อกเกินเมื่อ &gt; ค่านี้</span>
+                      </div>
+                    </div>
+
+                    {/* Visual Stock Level Indicator / Gauge */}
+                    <div className="pt-2 border-t border-slate-200/80 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-bold">
+                        <span className="text-slate-500">สถานะที่คำนวณได้:</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                          directEditQty === 0 ? 'bg-rose-100 text-rose-700' :
+                          directEditQty <= directEditMinStock ? 'bg-amber-100 text-amber-800' :
+                          directEditQty > directEditMaxStock ? 'bg-sky-100 text-sky-800' :
+                          'bg-emerald-100 text-emerald-800'
+                        }`}>
+                          {directEditQty === 0 ? '❌ สินค้าหมด (0)' :
+                           directEditQty <= directEditMinStock ? `⚠️ สต็อกต่ำ (≤${directEditMinStock})` :
+                           directEditQty > directEditMaxStock ? `📦 สต็อกเกิน (>${directEditMaxStock})` :
+                           '✅ สต็อกพร้อมใช้ (พอดี)'}
+                        </span>
+                      </div>
+
+                      <div className="relative w-full h-3 bg-slate-200 rounded-full overflow-hidden flex">
+                        {/* Red zone: 0 to Min */}
+                        <div 
+                          className="h-full bg-amber-400" 
+                          style={{ width: `${Math.min(100, (directEditMinStock / Math.max(1, directEditMaxStock * 1.2)) * 100)}%` }} 
+                          title="โซนสต็อกต่ำ"
+                        />
+                        {/* Green zone: Min to Max */}
+                        <div 
+                          className="h-full bg-emerald-400 flex-1" 
+                          title="โซนสต็อกเหมาะสม"
+                        />
+                        {/* Blue zone: > Max */}
+                        <div 
+                          className="h-full bg-sky-400 w-6" 
+                          title="โซนสต็อกเกิน"
+                        />
+                      </div>
+                      <div className="flex justify-between text-[9px] text-slate-400 font-mono">
+                        <span>0</span>
+                        <span className="text-amber-700 font-bold">Min ({directEditMinStock})</span>
+                        <span className="text-sky-700 font-bold">Max ({directEditMaxStock})</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-2 flex gap-3">
+              <div className="pt-3 border-t border-slate-100 flex gap-3">
                 <button
                   type="button"
                   onClick={() => {

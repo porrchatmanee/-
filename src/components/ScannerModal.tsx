@@ -9,7 +9,7 @@ import { useInventory } from '../lib/store';
 import { CATEGORIES } from '../lib/constants';
 import { CategoryId, InventoryItem } from '../types';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { normalizeBarcode, containsThai, extractBarcodeDigits } from '../lib/barcode';
+import { normalizeBarcode, containsThai, extractBarcodeDigits, parseGS1Barcode, areBarcodesMatching } from '../lib/barcode';
 import { formatThaiDate, generateLotNumber } from '../lib/lots';
 import { UnitSelector } from './UnitSelector';
 
@@ -138,11 +138,11 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
     setError('');
     setSuccessMsg('');
 
-    // Look up item by exact or normalized barcode
-    const foundItem = items.find(i => {
-      const itemClean = normalizeBarcode(i.id) || i.id.trim().toUpperCase();
-      return (code && itemClean === code) || i.id.toLowerCase() === code.toLowerCase();
-    });
+    // Parse GS1 barcode if applicable
+    const gs1 = parseGS1Barcode(codeStr);
+
+    // Look up item using intelligent matching (exact, normalized, or GS1 embedded GTIN)
+    const foundItem = items.find(i => areBarcodesMatching(code, i.id));
 
     if (foundItem) {
       playBeep();
@@ -156,15 +156,17 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
       }
 
       // Check if same item scanned again -> increment count!
-      if (scannedCode.toLowerCase() === code.toLowerCase()) {
+      if (scannedCode.toLowerCase() === foundItem.id.toLowerCase() || scannedCode.toLowerCase() === code.toLowerCase()) {
         setQuantity(prev => prev + 1);
       } else {
         setScannedCode(foundItem.id);
         setSelectedItemId(foundItem.id);
         setQuantity(1);
         setIsManualIssue(false);
-        setScanLotNumber('');
-        if (foundItem.expiryDate) {
+        setScanLotNumber(gs1.lotNumber || '');
+        if (gs1.expiryDate) {
+          setExpiryDate(gs1.expiryDate);
+        } else if (foundItem.expiryDate) {
           setExpiryDate(foundItem.expiryDate);
         }
       }
