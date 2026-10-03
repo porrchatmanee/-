@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { InventoryItem } from '../types';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { UnitSelector } from '../components/UnitSelector';
 
 export function CategoryView({ categoryId }: { categoryId: string }) {
   const { items, transactions, addItem, processTransaction, deleteItem, updateItem } = useInventory();
@@ -29,6 +30,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
 
   const [isDirectEditModalOpen, setIsDirectEditModalOpen] = useState(false);
   const [directEditItem, setDirectEditItem] = useState<InventoryItem | null>(null);
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<InventoryItem | null>(null);
   const [directEditName, setDirectEditName] = useState('');
   const [directEditQty, setDirectEditQty] = useState(0);
   const [directEditUnit, setDirectEditUnit] = useState('กล่อง');
@@ -738,9 +740,16 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
   const handleAddNewItem = (e: React.FormEvent) => {
     e.preventDefault();
     // Normalize barcode strictly: if user left Thai in box, convert automatically
-    const cleanId = (isAddNumericOnly ? extractBarcodeDigits(newId) : normalizeBarcode(newId)) || newId.replace(/\s+/g, '').toUpperCase();
-    if (!cleanId || !newName) {
-      setAddError('กรุณากรอกรหัสและชื่อรายการ');
+    let cleanId = (isAddNumericOnly ? extractBarcodeDigits(newId) : normalizeBarcode(newId)) || newId.replace(/\s+/g, '').toUpperCase();
+    
+    // Auto-generate code if item has no barcode
+    if (!cleanId) {
+      const prefix = (categoryId ? categoryId.substring(0, 3) : 'SKU').toUpperCase();
+      cleanId = `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`;
+    }
+
+    if (!newName.trim()) {
+      setAddError('กรุณากรอกชื่อรายการสินค้า');
       return;
     }
 
@@ -826,10 +835,8 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
     setDirectEditItem(null);
   };
 
-  const handleDeleteItem = (id: string, name: string) => {
-    if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบรายการ "${name}" ?`)) {
-      deleteItem(id);
-    }
+  const handleDeleteItem = (item: InventoryItem) => {
+    setDeleteConfirmItem(item);
   };
 
   return (
@@ -1257,6 +1264,25 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                               >
                                 <ArrowUpRight size={14} />
                               </button>
+                              <div className="w-[1px] h-5 bg-slate-200 mx-0.5"></div>
+                              <button
+                                onClick={() => {
+                                  setDirectEditItem(primaryItem);
+                                  setDirectEditQty(primaryItem.quantity);
+                                  setIsDirectEditModalOpen(true);
+                                }}
+                                className="w-8 h-8 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-indigo-600 flex items-center justify-center transition-all border border-slate-100 cursor-pointer active:scale-95"
+                                title="แก้ไขข้อมูล"
+                              >
+                                <Edit size={14} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteItem(primaryItem)}
+                                className="w-8 h-8 rounded-lg bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 flex items-center justify-center transition-all border border-slate-100 hover:border-rose-200 cursor-pointer active:scale-95"
+                                title="ลบรายการ"
+                              >
+                                <Trash2 size={14} />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -1424,8 +1450,8 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                               <Edit size={16} />
                             </button>
                             <button 
-                              onClick={() => handleDeleteItem(item.id, item.name)}
-                              className="w-9 h-9 rounded-xl bg-slate-50 text-slate-500 flex items-center justify-center hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all border border-slate-100 active:scale-95" 
+                              onClick={() => handleDeleteItem(item)}
+                              className="w-9 h-9 rounded-xl bg-slate-50 text-slate-500 flex items-center justify-center hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all border border-slate-100 active:scale-95 cursor-pointer" 
                               title="ลบรายการ"
                             >
                               <Trash2 size={16} />
@@ -1588,21 +1614,37 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
               )}
               
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-550 block flex items-center justify-between">
-                  <span>รหัสสินค้า / รหัสบาร์โค้ด (เช่น M008)</span>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddCameraActive(!isAddCameraActive)}
-                    className={`text-[10px] font-bold px-2 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
-                      isAddCameraActive 
-                        ? 'bg-rose-500 text-white' 
-                        : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
-                    }`}
-                  >
-                    <Camera size={11} />
-                    <span>{isAddCameraActive ? '🔒 ปิดกล้อง' : '📸 สแกนด้วยกล้อง'}</span>
-                  </button>
-                </label>
+                <div className="text-xs font-bold text-slate-550 flex items-center justify-between flex-wrap gap-1.5">
+                  <span>รหัสสินค้า / รหัสบาร์โค้ด <span className="text-[10px] text-slate-400 font-normal">(เว้นว่างได้)</span></span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const prefix = (categoryId ? categoryId.substring(0, 3) : 'SKU').toUpperCase();
+                        const autoCode = `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`;
+                        setNewId(autoCode);
+                        setAddError('');
+                      }}
+                      className="text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-all flex items-center gap-1 cursor-pointer"
+                      title="สุ่มสร้างรหัสสินค้าอัตโนมัติ สำหรับสินค้าที่ไม่มีบาร์โค้ด"
+                    >
+                      <Zap size={11} className="text-emerald-600" />
+                      <span>⚡ สร้างรหัสอัตโนมัติ (ไม่มีบาร์โค้ด)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddCameraActive(!isAddCameraActive)}
+                      className={`text-[10px] font-bold px-2 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                        isAddCameraActive 
+                          ? 'bg-rose-500 text-white' 
+                          : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                      }`}
+                    >
+                      <Camera size={11} />
+                      <span>{isAddCameraActive ? '🔒 ปิดกล้อง' : '📸 สแกนด้วยกล้อง'}</span>
+                    </button>
+                  </div>
+                </div>
 
                 {/* Mode Selector for Registration Barcode */}
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-2 p-2 bg-slate-50 border border-slate-200/80 rounded-xl">
@@ -1758,8 +1800,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                     <input
                       ref={addItemBarcodeRef}
                       type="text"
-                      required
-                      placeholder="สแกนหรือระบุรหัสสินค้า ตัวอย่าง M008 หรือ 885..."
+                      placeholder="สแกน หรือเว้นว่างเพื่อให้ระบบสร้างรหัสให้อัตโนมัติ (เช่น M008)..."
                       value={newId}
                       onChange={(e) => {
                         const val = e.target.value;
@@ -1857,23 +1898,12 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-550 block">หน่วยนับ</label>
-                  <select
-                    value={newUnit}
-                    onChange={(e) => setNewUnit(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-slate-700"
-                  >
-                    <option value="กล่อง">กล่อง</option>
-                    <option value="ขวด">ขวด</option>
-                    <option value="แผง">แผง</option>
-                    <option value="กระปุก">กระปุก</option>
-                    <option value="อัน">อัน</option>
-                    <option value="ชิ้น">ชิ้น</option>
-                    <option value="ถุง">ถุง</option>
-                    <option value="แกลลอน">แกลลอน</option>
-                  </select>
-                </div>
+                <UnitSelector
+                  value={newUnit}
+                  onChange={(u) => setNewUnit(u)}
+                  label="หน่วยนับ"
+                  selectClassName="bg-slate-50 border-slate-200 focus:ring-rose-500/20"
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2347,23 +2377,12 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-600 block">หน่วยนับ</label>
-                  <select
-                    value={directEditUnit}
-                    onChange={(e) => setDirectEditUnit(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 px-3 py-3 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 cursor-pointer"
-                  >
-                    <option value="กล่อง">กล่อง</option>
-                    <option value="ขวด">ขวด</option>
-                    <option value="แผง">แผง</option>
-                    <option value="กระปุก">กระปุก</option>
-                    <option value="อัน">อัน</option>
-                    <option value="ชิ้น">ชิ้น</option>
-                    <option value="ถุง">ถุง</option>
-                    <option value="แกลลอน">แกลลอน</option>
-                  </select>
-                </div>
+                <UnitSelector
+                  value={directEditUnit}
+                  onChange={(u) => setDirectEditUnit(u)}
+                  label="หน่วยนับ"
+                  selectClassName="bg-slate-50 border-slate-200 focus:ring-indigo-200 py-3"
+                />
               </div>
 
               {/* Min & Max Stock Inputs */}
@@ -2470,6 +2489,47 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* -------------------- MODAL: CONFIRM DELETE ITEM -------------------- */}
+      {deleteConfirmItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-6 text-center space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-100 shadow-inner">
+              <Trash2 size={26} />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-800">ยืนยันการลบสินค้า</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                คุณต้องการลบรายการ <strong className="text-slate-800">"{deleteConfirmItem.name}"</strong> (รหัส {deleteConfirmItem.id}) ออกจากคลังใช่หรือไม่?
+              </p>
+            </div>
+            <div className="p-3 bg-rose-50/60 rounded-xl border border-rose-100/80 text-[11px] text-rose-700 text-left leading-relaxed">
+              ⚠️ <strong>คำเตือน:</strong> การลบจะนำสินค้าและประวัติที่เกี่ยวข้องออกจากระบบทันที และไม่สามารถเรียกคืนได้
+            </div>
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmItem(null)}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const targetId = deleteConfirmItem.id;
+                  setDeleteConfirmItem(null);
+                  await deleteItem(targetId);
+                }}
+                className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-md shadow-rose-200 transition-colors cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+              >
+                <Trash2 size={14} />
+                <span>ยืนยันลบ</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

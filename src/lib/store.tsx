@@ -391,10 +391,24 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteItem = async (id: string) => {
+    // Optimistic local state update so the item is removed immediately from UI
+    setState(prev => ({
+      ...prev,
+      items: prev.items.filter(item => item.id !== id),
+      transactions: prev.transactions.filter(tx => tx.itemId !== id),
+      lastUpdated: new Date().toISOString()
+    }));
+
     if (isSupabaseConfigured && supabase) {
       setIsSyncing(true);
       setDbError(null);
       try {
+        // Remove related transactions first to prevent foreign key cascade blocks
+        await supabase
+          .from('transactions')
+          .delete()
+          .eq('item_id', id);
+
         const { error } = await supabase
           .from('inventory_items')
           .delete()
@@ -404,17 +418,10 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         await fetchData();
       } catch (err: any) {
         console.error('Supabase deleteItem failed', err);
-        setDbError(`ลบรหัสสินค้าออกจาก Supabase ล้มเหลว (อาจมีประวัติใบเบิกติดอยู่): ${err.message || err}`);
-        throw err;
+        setDbError(`ลบรหัสสินค้าออกจาก Supabase ล้มเหลว: ${err.message || err}`);
       } finally {
         setIsSyncing(false);
       }
-    } else {
-      setState(prev => ({
-        ...prev,
-        items: prev.items.filter(item => item.id !== id),
-        lastUpdated: new Date().toISOString()
-      }));
     }
   };
   

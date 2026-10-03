@@ -11,6 +11,7 @@ import { CategoryId, InventoryItem } from '../types';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { normalizeBarcode, containsThai, extractBarcodeDigits } from '../lib/barcode';
 import { formatThaiDate, generateLotNumber } from '../lib/lots';
+import { UnitSelector } from './UnitSelector';
 
 interface ScannerModalProps {
   isOpen: boolean;
@@ -469,7 +470,11 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
       return;
     }
 
-    const cleanId = (isNumericOnly ? extractBarcodeDigits(scannedCode) : normalizeBarcode(scannedCode)) || scannedCode.trim().toUpperCase();
+    let cleanId = (isNumericOnly ? extractBarcodeDigits(scannedCode) : normalizeBarcode(scannedCode)) || scannedCode.trim().toUpperCase();
+    if (!cleanId) {
+      const prefix = regCategory.substring(0, 3).toUpperCase();
+      cleanId = `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`;
+    }
 
     const newItem: InventoryItem = {
       id: cleanId,
@@ -1571,10 +1576,24 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
               )}
 
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-500 block">รหัสสุกิจบาร์โค้ด (แก้ไขได้)</label>
+                <div className="flex items-center justify-between text-[10px] font-black text-slate-500">
+                  <span>รหัสสินค้า / รหัสบาร์โค้ด <span className="font-normal text-slate-400">(เว้นว่างได้)</span></span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const prefix = regCategory.substring(0, 3).toUpperCase();
+                      setScannedCode(`${prefix}-${Math.floor(100000 + Math.random() * 900000)}`);
+                    }}
+                    className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-lg border border-indigo-200 transition-colors"
+                  >
+                    <Zap size={11} className="text-amber-500" />
+                    <span>⚡ สร้างรหัสอัตโนมัติ (ไม่มีบาร์โค้ด)</span>
+                  </button>
+                </div>
                 <div className="relative">
                   <input
                     type="text"
+                    placeholder="สแกน หรือเว้นว่างเพื่อสร้างรหัสอัตโนมัติ..."
                     value={scannedCode}
                     onChange={(e) => setScannedCode(isNumericOnly ? extractBarcodeDigits(e.target.value) : normalizeBarcode(e.target.value))}
                     className="w-full bg-white border border-indigo-200 text-indigo-700 px-3.5 py-2.5 rounded-xl font-mono text-xs font-bold h-10 focus:ring-2 focus:ring-indigo-100 outline-none"
@@ -1622,7 +1641,7 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
                   autoFocus
                   type="text"
                   required
-                  placeholder="เช่น พลาสเตอร์ปิดแผล, แอกลอฮอล์สเปรย์ ขวดใหญ่"
+                  placeholder="เช่น พลาสเตอร์ปิดแผล, กระดาษ A4 80 แกรม, น้ำยาล้างจาน"
                   value={regName}
                   onChange={(e) => {
                     setRegName(e.target.value);
@@ -1646,23 +1665,13 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
                   </select>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-500 block">หน่วยนับ</label>
-                  <select
-                    value={regUnit}
-                    onChange={(e) => setRegUnit(e.target.value)}
-                    className="w-full bg-white border border-slate-200 px-3 py-2 rounded-xl text-[11px] font-bold text-slate-700 h-10 focus:outline-none"
-                  >
-                    <option value="กล่อง">กล่อง</option>
-                    <option value="ขวด">ขวด</option>
-                    <option value="แผง">แผง</option>
-                    <option value="ชิ้น">ชิ้น</option>
-                    <option value="ถุง">ถุง</option>
-                    <option value="กระปุก">กระปุก</option>
-                    <option value="อัน">อัน</option>
-                    <option value="แกลลอน">แกลลอน</option>
-                  </select>
-                </div>
+                <UnitSelector
+                  value={regUnit}
+                  onChange={(u) => setRegUnit(u)}
+                  label="หน่วยนับ"
+                  compact={true}
+                  selectClassName="bg-white border-slate-200 h-10 py-1.5 text-xs"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
