@@ -21,6 +21,14 @@ interface InventoryContextType extends AppState {
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
+export const normalizeItemName = (name: string): string => {
+  return (name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/no\./gi, 'no');
+};
+
 const getStoredLimits = (): Record<string, { minStock?: number; maxStock?: number }> => {
   try {
     const saved = localStorage.getItem('sukjai_item_stock_limits_v1');
@@ -263,8 +271,17 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateItem = async (id: string, updates: Partial<InventoryItem>) => {
+    // Find matching items with the same name to sync Min-Max
+    const currentItem = state.items.find(i => i.id === id);
+    const targetNormName = currentItem ? normalizeItemName(updates.name || currentItem.name) : '';
+    const sameNamedItemIds = state.items
+      .filter(i => targetNormName && normalizeItemName(i.name) === targetNormName)
+      .map(i => i.id);
+
     if (updates.minStock !== undefined || updates.maxStock !== undefined) {
-      saveStoredLimit(id, updates.minStock, updates.maxStock);
+      sameNamedItemIds.forEach(itemId => {
+        saveStoredLimit(itemId, updates.minStock, updates.maxStock);
+      });
     }
 
     if (isSupabaseConfigured && supabase) {
@@ -300,6 +317,20 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (error) throw error;
+
+        // Auto sync min_stock and max_stock to all other items with the same name
+        if ((updates.minStock !== undefined || updates.maxStock !== undefined) && sameNamedItemIds.length > 1) {
+          const limitUpdates: any = {};
+          if (updates.minStock !== undefined) limitUpdates.min_stock = updates.minStock;
+          if (updates.maxStock !== undefined) limitUpdates.max_stock = updates.maxStock;
+          
+          for (const otherId of sameNamedItemIds) {
+            if (otherId !== id) {
+              await supabase.from('inventory_items').update(limitUpdates).eq('id', otherId).catch(() => {});
+            }
+          }
+        }
+
         await fetchData();
       } catch (err: any) {
         console.error('Supabase updateItem failed', err);
@@ -311,7 +342,18 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     } else {
       setState(prev => ({
         ...prev,
-        items: prev.items.map(item => item.id === id ? { ...item, ...updates } : item),
+        items: prev.items.map(item => {
+          if (item.id === id) {
+            return { ...item, ...updates };
+          }
+          if (targetNormName && normalizeItemName(item.name) === targetNormName) {
+            const limitUpdates: Partial<InventoryItem> = {};
+            if (updates.minStock !== undefined) limitUpdates.minStock = updates.minStock;
+            if (updates.maxStock !== undefined) limitUpdates.maxStock = updates.maxStock;
+            return { ...item, ...limitUpdates };
+          }
+          return item;
+        }),
         lastUpdated: new Date().toISOString()
       }));
     }
@@ -346,24 +388,33 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
   };
   
   const addItem = async (item: InventoryItem) => {
-    if (item.minStock !== undefined || item.maxStock !== undefined) {
-      saveStoredLimit(item.id, item.minStock, item.maxStock);
-    }
+    // Inherit Min/Max from existing item if same name exists
+    const existingSameName = state.items.find(i => normalizeItemName(i.name) === normalizeItemName(item.name));
+    const effectiveMin = item.minStock !== undefined ? item.minStock : (existingSameName?.minStock ?? 10);
+    const effectiveMax = item.maxStock !== undefined ? item.maxStock : (existingSameName?.maxStock ?? 100);
+
+    const enrichedItem: InventoryItem = {
+      ...item,
+      minStock: effectiveMin,
+      maxStock: effectiveMax,
+    };
+
+    saveStoredLimit(enrichedItem.id, enrichedItem.minStock, enrichedItem.maxStock);
 
     if (isSupabaseConfigured && supabase) {
       setIsSyncing(true);
       setDbError(null);
       try {
         const payload: any = {
-          id: item.id,
-          name: item.name,
-          category_id: item.categoryId,
-          quantity: item.quantity,
-          unit: item.unit,
-          expiry_date: item.expiryDate || null,
+          id: enrichedItem.id,
+          name: enrichedItem.name,
+          category_id: enrichedItem.categoryId,
+          quantity: enrichedItem.quantity,
+          unit: enrichedItem.unit,
+          expiry_date: enrichedItem.expiryDate || null,
+          min_stock: enrichedItem.minStock,
+          max_stock: enrichedItem.maxStock,
         };
-        if (item.minStock !== undefined) payload.min_stock = item.minStock;
-        if (item.maxStock !== undefined) payload.max_stock = item.maxStock;
 
         let { error } = await supabase.from('inventory_items').insert(payload);
         if (error && (error.message.includes('min_stock') || error.message.includes('max_stock') || error.code === 'PGRST204')) {
@@ -385,7 +436,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     } else {
       setState(prev => ({
         ...prev,
-        items: [...prev.items, item],
+        items: [...prev.items, enrichedItem],
         lastUpdated: new Date().toISOString()
       }));
     }

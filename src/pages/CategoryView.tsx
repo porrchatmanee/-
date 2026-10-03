@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useInventory } from '../lib/store';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useInventory, normalizeItemName } from '../lib/store';
 import { CATEGORIES } from '../lib/constants';
 import { normalizeBarcode, containsThai, extractBarcodeDigits } from '../lib/barcode';
 import { generateLotNumber } from '../lib/lots';
@@ -33,6 +33,9 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
   const [directEditUnit, setDirectEditUnit] = useState('กล่อง');
   const [directEditMinStock, setDirectEditMinStock] = useState<number>(10);
   const [directEditMaxStock, setDirectEditMaxStock] = useState<number>(100);
+
+  // Mode for viewing items: 'grouped' (combine same-named items) vs 'all' (raw barcodes)
+  const [itemViewMode, setItemViewMode] = useState<'grouped' | 'all'>('grouped');
 
   // New Item Form
   const [newId, setNewId] = useState('');
@@ -647,12 +650,66 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
     return 50; // Fallback price
   };
 
-  // 1. Calculations for upper summary cards (Matching screenshot)
-  const totalItems = categoryItems.length;
+  // Unified / Grouped Category Items by Normalized Name
+  const groupedCategoryItems = useMemo(() => {
+    const groups: Record<string, {
+      key: string;
+      name: string;
+      id: string;
+      categoryId: string;
+      quantity: number;
+      unit: string;
+      minStock: number;
+      maxStock: number;
+      expiryDate?: string;
+      barcodes: string[];
+      items: InventoryItem[];
+      lots: any[];
+    }> = {};
+
+    categoryItems.forEach(item => {
+      const normKey = normalizeItemName(item.name) || item.id;
+      if (!groups[normKey]) {
+        groups[normKey] = {
+          key: normKey,
+          name: item.name,
+          id: item.id,
+          categoryId: item.categoryId,
+          quantity: 0,
+          unit: item.unit,
+          minStock: item.minStock ?? 10,
+          maxStock: item.maxStock ?? 100,
+          expiryDate: item.expiryDate,
+          barcodes: [],
+          items: [],
+          lots: [],
+        };
+      }
+      const g = groups[normKey];
+      g.quantity += item.quantity;
+      if (!g.barcodes.includes(item.id)) {
+        g.barcodes.push(item.id);
+      }
+      g.items.push(item);
+      if (item.lots) {
+        g.lots.push(...item.lots);
+      }
+      if (item.expiryDate) {
+        if (!g.expiryDate || new Date(item.expiryDate) < new Date(g.expiryDate)) {
+          g.expiryDate = item.expiryDate;
+        }
+      }
+    });
+
+    return Object.values(groups);
+  }, [categoryItems]);
+
+  // 1. Calculations for upper summary cards (Based on grouped unique products)
+  const totalItems = groupedCategoryItems.length;
   const totalStockQty = categoryItems.reduce((acc, curr) => acc + curr.quantity, 0);
-  const lowStockCount = categoryItems.filter(i => i.quantity > 0 && i.quantity <= (i.minStock ?? 10)).length;
-  const overStockCount = categoryItems.filter(i => i.quantity > (i.maxStock ?? 100)).length;
-  const expiringCount = categoryItems.filter(i => i.expiryDate).length; // any with expiry
+  const lowStockCount = groupedCategoryItems.filter(i => i.quantity > 0 && i.quantity <= i.minStock).length;
+  const overStockCount = groupedCategoryItems.filter(i => i.quantity > i.maxStock).length;
+  const expiringCount = groupedCategoryItems.filter(i => i.expiryDate).length;
   
   // Filter today's transactions for this category's items
   const todayStr = new Date().toISOString().split('T')[0];
@@ -1011,7 +1068,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-rose-500 font-bold text-sm tracking-wide">แจ้งเตือน: สต๊อกต่ำ</h3>
                 <span className="text-[11px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">
-                  {categoryItems.filter(i => i.quantity < 10).length} รายการ
+                  {groupedCategoryItems.filter(i => i.quantity > 0 && i.quantity <= i.minStock).length} รายการ
                 </span>
               </div>
               
@@ -1021,12 +1078,14 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
               </div>
 
               <div className="flex-1 space-y-3 overflow-y-auto min-w-0">
-                {categoryItems.filter(i => i.quantity < 10).length > 0 ? (
-                  categoryItems.filter(i => i.quantity < 10).map(item => (
-                    <div key={item.id} className="flex justify-between items-center text-sm gap-2 hover:bg-slate-50 p-1.5 rounded-xl transition-colors">
+                {groupedCategoryItems.filter(i => i.quantity > 0 && i.quantity <= i.minStock).length > 0 ? (
+                  groupedCategoryItems.filter(i => i.quantity > 0 && i.quantity <= i.minStock).map(item => (
+                    <div key={item.key} className="flex justify-between items-center text-sm gap-2 hover:bg-slate-50 p-1.5 rounded-xl transition-colors">
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-slate-700 truncate text-sm" title={item.name}>{item.name}</div>
-                        <div className="font-mono text-[11px] text-slate-400 font-semibold truncate" title={item.id}>{item.id}</div>
+                        <div className="font-mono text-[11px] text-slate-400 font-semibold truncate" title={item.id}>
+                          {item.id} {item.barcodes.length > 1 && `(+${item.barcodes.length - 1} รหัส)`}
+                        </div>
                       </div>
                       <div className="text-right shrink-0">
                         <span className="font-black text-rose-600 bg-rose-50 px-2.5 py-1 rounded-lg text-xs border border-rose-100 inline-block shadow-xs">
@@ -1046,7 +1105,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-indigo-600 font-bold text-sm tracking-wide">แจ้งเตือน: สต๊อกเกิน</h3>
                 <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
-                  {categoryItems.filter(i => i.quantity > 100).length} รายการ
+                  {groupedCategoryItems.filter(i => i.quantity > i.maxStock).length} รายการ
                 </span>
               </div>
               
@@ -1056,12 +1115,14 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
               </div>
 
               <div className="flex-1 space-y-3 overflow-y-auto font-sans min-w-0">
-                {categoryItems.filter(i => i.quantity > 100).length > 0 ? (
-                  categoryItems.filter(i => i.quantity > 100).map(item => (
-                    <div key={item.id} className="flex justify-between items-center text-sm gap-2 hover:bg-slate-50 p-1.5 rounded-xl transition-colors">
+                {groupedCategoryItems.filter(i => i.quantity > i.maxStock).length > 0 ? (
+                  groupedCategoryItems.filter(i => i.quantity > i.maxStock).map(item => (
+                    <div key={item.key} className="flex justify-between items-center text-sm gap-2 hover:bg-slate-50 p-1.5 rounded-xl transition-colors">
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-slate-700 truncate text-sm" title={item.name}>{item.name}</div>
-                        <div className="font-mono text-[11px] text-slate-400 font-semibold truncate" title={item.id}>{item.id}</div>
+                        <div className="font-mono text-[11px] text-slate-400 font-semibold truncate" title={item.id}>
+                          {item.id} {item.barcodes.length > 1 && `(+${item.barcodes.length - 1} รหัส)`}
+                        </div>
                       </div>
                       <div className="text-right shrink-0">
                         <span className="font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg text-xs border border-indigo-100 inline-block shadow-xs">
@@ -1081,7 +1142,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-rose-500 font-bold text-sm tracking-wide">แจ้งเตือน: วันหมดอายุ</h3>
                 <span className="text-[11px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">
-                  {categoryItems.filter(i => i.expiryDate).length} รายการ
+                  {groupedCategoryItems.filter(i => i.expiryDate).length} รายการ
                 </span>
               </div>
               
@@ -1091,13 +1152,13 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
               </div>
 
               <div className="flex-1 space-y-3 overflow-y-auto min-w-0">
-                {categoryItems.filter(i => i.expiryDate).length > 0 ? (
-                  categoryItems.filter(i => i.expiryDate).map(item => (
-                    <div key={item.id} className="flex justify-between items-center text-sm gap-2 hover:bg-slate-50 p-1.5 rounded-xl transition-colors">
+                {groupedCategoryItems.filter(i => i.expiryDate).length > 0 ? (
+                  groupedCategoryItems.filter(i => i.expiryDate).map(item => (
+                    <div key={item.key} className="flex justify-between items-center text-sm gap-2 hover:bg-slate-50 p-1.5 rounded-xl transition-colors">
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-slate-700 truncate text-sm" title={item.name}>{item.name}</div>
                         <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold mt-0.5">
-                          <span>คงเหลือ:</span>
+                          <span>คงเหลือรวม:</span>
                           <span className="text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded font-black text-[11px]">
                             {item.quantity} {item.unit}
                           </span>
@@ -1122,10 +1183,10 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
               <div>
                 <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
                   <Package className="text-rose-500" size={20} />
-                  <span>รายการสินค้าและจำนวนคงเหลือในคลัง ({categoryItems.length} รายการ)</span>
+                  <span>รายการสินค้าและจำนวนคงเหลือในคลัง ({groupedCategoryItems.length} รายการ)</span>
                 </h3>
                 <p className="text-xs text-slate-400 font-medium mt-0.5">
-                  ตรวจสอบและอัปเดตยอดคงเหลือเวชภัณฑ์ทั้งหมดได้ทันที
+                  รวมยอดสต็อกและคำนวณเกณฑ์ Min-Max ตามชื่อสินค้าอัตโนมัติ
                 </p>
               </div>
 
@@ -1141,7 +1202,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-100 text-slate-400 text-xs font-bold">
-                    <th className="pb-3 pl-2 w-32">รหัสสินค้า</th>
+                    <th className="pb-3 pl-2 w-36">รหัสสินค้า</th>
                     <th className="pb-3">ชื่อรายการสินค้า</th>
                     <th className="pb-3 text-center w-36">จำนวนคงเหลือ</th>
                     <th className="pb-3 text-center w-36">เกณฑ์ Min - Max</th>
@@ -1151,13 +1212,19 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {categoryItems.length > 0 ? (
-                    categoryItems.map(item => {
-                      const status = getStatus(item);
+                  {groupedCategoryItems.length > 0 ? (
+                    groupedCategoryItems.map(item => {
+                      const status = getStatus(item as any);
+                      const primaryItem = item.items[0];
                       return (
-                        <tr key={item.id} className="hover:bg-slate-50/60 transition-colors group">
+                        <tr key={item.key} className="hover:bg-slate-50/60 transition-colors group">
                           <td className="py-3.5 pl-2 font-mono text-xs font-semibold text-slate-500">
-                            {item.id}
+                            <div>{item.id}</div>
+                            {item.barcodes.length > 1 && (
+                              <span className="inline-block mt-0.5 text-[10px] font-extrabold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded-md border border-indigo-100">
+                                รวม {item.barcodes.length} บาร์โค้ด
+                              </span>
+                            )}
                           </td>
                           <td className="py-3.5 font-bold text-slate-800 text-sm">
                             {item.name}
@@ -1171,13 +1238,13 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                           <td className="py-3.5 text-center">
                             <button
                               type="button"
-                              onClick={() => openEditModal(item)}
+                              onClick={() => openEditModal(primaryItem)}
                               className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 bg-slate-100/90 hover:bg-indigo-50 px-2.5 py-1 rounded-xl border border-slate-200/80 transition-all cursor-pointer group"
-                              title="คลิกเพื่อแก้ไขเกณฑ์ Min - Max"
+                              title="คลิกเพื่อแก้ไขเกณฑ์ Min - Max ทุกบาร์โค้ดที่มีชื่อนี้"
                             >
-                              <span className="text-amber-700 font-mono font-bold">Min: {item.minStock ?? 10}</span>
+                              <span className="text-amber-700 font-mono font-bold">Min: {item.minStock}</span>
                               <span className="text-slate-300">|</span>
-                              <span className="text-sky-700 font-mono font-bold">Max: {item.maxStock ?? 100}</span>
+                              <span className="text-sky-700 font-mono font-bold">Max: {item.maxStock}</span>
                               <Edit size={10} className="text-slate-400 group-hover:text-indigo-600 ml-0.5" />
                             </button>
                           </td>
@@ -1193,7 +1260,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                               <div className="mt-1">
                                 <button
                                   type="button"
-                                  onClick={() => setViewLotsItem(item)}
+                                  onClick={() => setViewLotsItem(primaryItem)}
                                   className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-0.5 rounded-full border border-indigo-200 cursor-pointer inline-flex items-center gap-1 transition-all"
                                   title="คลิกเพื่อดูล็อตย่อยและวันหมดอายุแต่ละล็อต"
                                 >
@@ -1212,7 +1279,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                             <div className="flex items-center justify-center gap-1.5">
                               <button
                                 onClick={() => {
-                                  setAdjustItem(item);
+                                  setAdjustItem(primaryItem);
                                   setAdjustType('RECEIVE');
                                   setIsAdjustModalOpen(true);
                                 }}
@@ -1223,7 +1290,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                               </button>
                               <button
                                 onClick={() => {
-                                  setAdjustItem(item);
+                                  setAdjustItem(primaryItem);
                                   setAdjustType('ISSUE');
                                   setIsAdjustModalOpen(true);
                                 }}
@@ -1254,9 +1321,9 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
       {/* -------------------- TAB: ITEMS LIST (รายการสินค้า) -------------------- */}
       {activeTab === 'items' && (
         <div className="flex flex-col gap-6">
-          {/* Search container */}
-          <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm mb-2">
-            <div className="relative">
+          {/* Search container & Mode toggle */}
+          <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-sm mb-2 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="relative flex-1">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                 <Search size={18} />
               </div>
@@ -1267,6 +1334,31 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-300 transition-all text-sm"
               />
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-2xl shrink-0 self-start md:self-auto">
+              <button
+                type="button"
+                onClick={() => setItemViewMode('grouped')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  itemViewMode === 'grouped'
+                    ? 'bg-white text-slate-800 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                📦 รวมตามชื่อสินค้า ({groupedCategoryItems.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setItemViewMode('all')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  itemViewMode === 'all'
+                    ? 'bg-white text-slate-800 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                🏷️ แยกตามรหัสบาร์โค้ด ({categoryItems.length})
+              </button>
             </div>
           </div>
 
