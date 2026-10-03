@@ -178,8 +178,8 @@ export function getDaysUntilExpiry(dateStr?: string): number {
  * Groups inventory items by Name (aggressively normalized) to collapse duplicates.
  * Also handles merging of lots and FEFO logic for the grouped entry.
  */
-export function groupInventoryItems(items: InventoryItem[]): (InventoryItem & { groupBarcodes: string[] })[] {
-  const map = new Map<string, InventoryItem & { groupBarcodes: string[] }>();
+export function groupInventoryItems(items: InventoryItem[]): (InventoryItem & { groupBarcodes: string[]; key: string })[] {
+  const map = new Map<string, InventoryItem & { groupBarcodes: string[]; key: string }>();
   
   items.forEach(item => {
     // Aggressive normalization: Remove all spaces and non-alphanumeric Thai/English characters for the key
@@ -219,7 +219,7 @@ export function groupInventoryItems(items: InventoryItem[]): (InventoryItem & { 
       if (item.minStock !== undefined && item.minStock !== 10) existing.minStock = item.minStock;
       if (item.maxStock !== undefined && item.maxStock !== 100) existing.maxStock = item.maxStock;
     } else {
-      map.set(key, { ...item, groupBarcodes: [item.id] });
+      map.set(key, { ...item, groupBarcodes: [item.id], key });
     }
   });
   

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useInventory } from '../lib/store';
 import { CATEGORIES } from '../lib/constants';
 import { InventoryItem, Transaction } from '../types';
-import { formatThaiDate, getDaysUntilExpiry } from '../lib/lots';
+import { formatThaiDate, getDaysUntilExpiry, groupInventoryItems } from '../lib/lots';
 import { 
   Printer, Download, FileText, Filter, Calendar, 
   Package, AlertTriangle, CheckCircle2, Search, ArrowUpRight, 
@@ -702,7 +702,7 @@ export function ReportsPage() {
                         const max = item.maxStock ?? 100;
 
                         return (
-                          <tr key={item.id} className="hover:bg-slate-50/75 transition-colors">
+                          <tr key={item.key} className="hover:bg-slate-50/75 transition-colors">
                             <td className="py-3 px-4 text-center font-bold text-slate-400">{idx + 1}</td>
                             <td className="py-3 px-4 font-mono font-bold text-indigo-600">{item.id}</td>
                             <td className="py-3 px-4 font-bold text-slate-800">{item.name}</td>
@@ -1457,7 +1457,7 @@ export function ReportsPage() {
                 }
 
                 return (
-                  <tr key={item.id} className="border-b border-slate-300">
+                  <tr key={item.key} className="border-b border-slate-300">
                     <td className="border border-slate-300 p-2 text-center">{idx + 1}</td>
                     <td className="border border-slate-300 p-2 font-mono font-bold">{item.id}</td>
                     <td className="border border-slate-300 p-2 font-bold">{item.name}</td>

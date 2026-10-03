@@ -426,7 +426,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   const hasMultipleBarcodes = (item as any).groupBarcodes?.length > 1;
 
                   return (
-                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
+                    <tr key={(item as any).key || item.id} className="hover:bg-slate-50/80 transition-colors group">
                       {/* Barcode ID */}
                       <td className="py-3.5 px-4 font-mono text-xs font-bold text-slate-500">
                         <div className="flex flex-col">

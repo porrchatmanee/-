@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useInventory, normalizeItemName } from '../lib/store';
 import { CATEGORIES } from '../lib/constants';
 import { normalizeBarcode, containsThai, extractBarcodeDigits } from '../lib/barcode';
-import { generateLotNumber } from '../lib/lots';
+import { generateLotNumber, groupInventoryItems } from '../lib/lots';
 import { 
   Search, Plus, LayoutGrid, Package, ArrowLeftRight, FileText, 
   ArrowDownLeft, ArrowUpRight, AlertTriangle, Clock, Target, 
@@ -1335,8 +1335,9 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                 <tbody className="divide-y divide-slate-50">
                   {filteredItems.map((item) => {
                     const status = getStatus(item);
+                    const itemKey = (item as any).key || item.id;
                     return (
-                      <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
+                      <tr key={itemKey} className="hover:bg-slate-50/50 transition-colors group">
                         <td className="p-5 pl-6 text-slate-400 font-mono text-sm font-medium">
                           {item.id}
                         </td>
