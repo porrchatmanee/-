@@ -17,7 +17,7 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 md:p-8 w-full max-w-full space-y-8">
       <header className="mb-10 text-left">
         <h1 className="text-3xl font-black text-slate-800 tracking-tight">ตั้งค่าระบบ</h1>
         <p className="text-slate-500 mt-2 text-base md:text-lg">จัดการเชื่อมต่อ Cloud ฐานข้อมูลสากลและการซิงก์ข้อมูลของ SUKJAI Hub</p>

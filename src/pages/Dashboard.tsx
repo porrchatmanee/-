@@ -117,7 +117,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto pt-6 md:pt-10 space-y-10">
+    <div className="p-4 sm:p-6 md:p-8 w-full max-w-full pt-6 md:pt-8 space-y-8 md:space-y-10">
       
       {/* Header */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -401,18 +401,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </div>
 
         {/* The Product Stock Table */}
-        <div className="overflow-x-auto rounded-2xl border border-slate-150">
+        <div className="overflow-x-auto rounded-2xl border border-slate-150 font-sans">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 text-xs font-bold uppercase tracking-wider">
-                <th className="py-3 px-4 w-32">รหัสสินค้า</th>
-                <th className="py-3 px-4">ชื่อรายการสินค้า</th>
-                <th className="py-3 px-4 w-32">หมวดหมู่</th>
-                <th className="py-3 px-4 text-center w-36">จำนวนคงเหลือ</th>
-                <th className="py-3 px-4 text-center w-36">เกณฑ์ Min - Max</th>
-                <th className="py-3 px-4 text-center w-40">วันหมดอายุ</th>
-                <th className="py-3 px-4 text-center w-32">สถานะ</th>
-                <th className="py-3 px-4 text-center w-28">จัดการ</th>
+              <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 text-xs font-bold uppercase tracking-wider">
+                <th className="py-3.5 px-4 pl-5">รายการสินค้า & รหัสบาร์โค้ด</th>
+                <th className="py-3.5 px-3 text-center w-28 whitespace-nowrap">หมวดหมู่</th>
+                <th className="py-3.5 px-3 text-center w-32 whitespace-nowrap">จำนวนคงเหลือ</th>
+                <th className="py-3.5 px-3 text-center w-36 whitespace-nowrap">เกณฑ์ Min - Max</th>
+                <th className="py-3.5 px-3 text-center w-36 whitespace-nowrap">วันหมดอายุ</th>
+                <th className="py-3.5 px-3 text-center w-32 whitespace-nowrap">สถานะ</th>
+                <th className="py-3.5 px-3 text-center w-28 pr-4 whitespace-nowrap">จัดการ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -427,39 +426,43 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
                   return (
                     <tr key={(item as any).key || item.id} className="hover:bg-slate-50/80 transition-colors group">
-                      {/* Barcode ID */}
-                      <td className="py-3.5 px-4 font-mono text-xs font-bold text-slate-500">
-                        <div className="flex flex-col">
-                          <span>{displayId}</span>
-                          {hasMultipleBarcodes && (
-                            <span className="text-[10px] text-indigo-400 font-bold mt-0.5">
-                              (+{(item as any).groupBarcodes.length - 1} รหัสอื่นในกลุ่ม)
+                      {/* Name & Barcode in a unified primary column */}
+                      <td className="py-4 px-4 pl-5">
+                        <div className="flex flex-col gap-1 w-full">
+                          <div className="font-extrabold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors leading-snug break-words">
+                            {item.name}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span 
+                              className="font-mono text-[11px] font-semibold text-slate-500 bg-slate-100/90 hover:bg-slate-200/80 px-2 py-0.5 rounded-md border border-slate-200/80 transition-colors inline-flex items-center gap-1 cursor-default max-w-full"
+                              title={`รหัสสินค้า / บาร์โค้ด: ${displayId}`}
+                            >
+                              <span className="text-[10px] text-slate-400 font-sans">รหัส:</span>
+                              <span className="truncate">{displayId}</span>
                             </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Name */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-extrabold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">
-                          {item.name}
+                            {hasMultipleBarcodes && (
+                              <span className="text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-200/80 font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap">
+                                +{(item as any).groupBarcodes.length - 1} รหัสอื่นในกลุ่ม
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
 
                       {/* Category Badge */}
-                      <td className="py-3.5 px-4">
-                        <span className={`inline-block px-2.5 py-1 rounded-xl text-xs font-bold ${cat?.bgColor || 'bg-slate-100'} ${cat?.color || 'text-slate-600'} border ${cat?.borderColor || 'border-slate-200'}`}>
+                      <td className="py-4 px-3 text-center whitespace-nowrap">
+                        <span className={`inline-block px-2.5 py-1 rounded-xl text-xs font-bold whitespace-nowrap ${cat?.bgColor || 'bg-slate-100'} ${cat?.color || 'text-slate-600'} border ${cat?.borderColor || 'border-slate-200'}`}>
                           {cat?.name || item.categoryId}
                         </span>
                       </td>
 
                       {/* Stock Quantity - High Visibility */}
-                      <td className="py-3.5 px-4 text-center">
-                        <span className={`inline-flex items-baseline gap-1 px-3 py-1 rounded-xl font-mono ${
-                          item.quantity === 0 ? 'bg-rose-50 border border-rose-200 text-rose-700' :
-                          item.quantity <= (item.minStock ?? 10) ? 'bg-amber-50 border border-amber-200 text-amber-800' :
-                          item.quantity > (item.maxStock ?? 100) ? 'bg-sky-50 border border-sky-200 text-sky-800' :
-                          'bg-slate-100 text-slate-900'
+                      <td className="py-4 px-3 text-center whitespace-nowrap">
+                        <span className={`inline-flex items-baseline justify-center gap-1 px-3 py-1 rounded-xl font-mono whitespace-nowrap ${
+                          item.quantity === 0 ? 'bg-rose-50 border border-rose-200 text-rose-700 font-black' :
+                          item.quantity <= (item.minStock ?? 10) ? 'bg-amber-50 border border-amber-200 text-amber-800 font-black' :
+                          item.quantity > (item.maxStock ?? 100) ? 'bg-sky-50 border border-sky-200 text-sky-800 font-black' :
+                          'bg-slate-100/90 text-slate-900 font-bold'
                         }`}>
                           <span className="text-base font-black">{item.quantity}</span>
                           <span className="text-xs font-bold text-slate-500 font-sans">{item.unit}</span>
@@ -467,62 +470,60 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       </td>
 
                       {/* Min - Max Column with Click-to-Edit Badge */}
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-4 px-3 text-center whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => openDashboardMinMaxModal(item)}
-                          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 bg-slate-100/80 hover:bg-indigo-50 px-2.5 py-1 rounded-xl border border-slate-200/80 transition-all cursor-pointer group"
+                          className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 bg-slate-100/80 hover:bg-indigo-50 px-2.5 py-1 rounded-xl border border-slate-200/80 transition-all cursor-pointer whitespace-nowrap group"
                           title="คลิกเพื่อแก้ไขเกณฑ์ Min - Max ของสินค้านี้"
                         >
                           <span className="text-amber-700 font-mono font-bold">Min: {item.minStock ?? 10}</span>
                           <span className="text-slate-300">|</span>
                           <span className="text-sky-700 font-mono font-bold">Max: {item.maxStock ?? 100}</span>
-                          <Edit size={10} className="text-slate-400 group-hover:text-indigo-600 ml-0.5" />
+                          <Edit size={11} className="text-slate-400 group-hover:text-indigo-600 ml-0.5" />
                         </button>
                       </td>
 
                       {/* Expiry Date & Lots Details */}
-                      <td className="py-3.5 px-4 text-center">
-                        <div>
+                      <td className="py-4 px-3 text-center whitespace-nowrap">
+                        <div className="flex flex-col items-center justify-center gap-1 whitespace-nowrap">
                           {item.expiryDate ? (
-                            <span className="font-bold text-xs text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100 inline-block">
+                            <span className="font-bold text-xs text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100 inline-block whitespace-nowrap">
                               {formatThaiDate(item.expiryDate)}
                             </span>
                           ) : (
                             <span className="text-slate-300 font-bold">-</span>
                           )}
-                        </div>
 
-                        {/* Always allow viewing lot details if lots exist */}
-                        {item.lots && item.lots.length >= 1 && (
-                          <div className="mt-1">
+                          {/* Always allow viewing lot details if lots exist */}
+                          {item.lots && item.lots.length >= 1 && (
                             <button
                               type="button"
                               onClick={() => setInspectLotItem(item)}
-                              className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-0.5 rounded-full border border-indigo-200 cursor-pointer inline-flex items-center gap-1 transition-all"
+                              className="text-[10px] font-black text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-0.5 rounded-full border border-indigo-200 cursor-pointer inline-flex items-center justify-center gap-1 transition-all whitespace-nowrap"
                               title="คลิกเพื่อดูล็อตย่อยและวันหมดอายุแต่ละล็อต"
                             >
-                              <Tag size={10} />
-                              <span>{item.lots.length} ล็อต (คลิกดู)</span>
+                              <Tag size={10} className="shrink-0" />
+                              <span className="whitespace-nowrap">{item.lots.length} ล็อต (คลิกดู)</span>
                             </button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </td>
 
                       {/* Status */}
-                      <td className="py-3.5 px-4 text-center">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-extrabold border ${status.class}`}>
+                      <td className="py-4 px-3 text-center whitespace-nowrap">
+                        <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-2xs border ${status.class}`}>
                           {status.label}
                         </span>
                       </td>
 
                       {/* Action */}
-                      <td className="py-3.5 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1">
+                      <td className="py-4 px-3 text-center pr-4 whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() => openDashboardMinMaxModal(item)}
-                            className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 flex items-center justify-center transition-colors cursor-pointer"
+                            className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 flex items-center justify-center transition-colors cursor-pointer"
                             title="ตั้งค่า Min-Max"
                           >
                             <SlidersHorizontal size={14} />
@@ -530,7 +531,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                           <button
                             type="button"
                             onClick={() => onNavigate(`category_${item.categoryId}`)}
-                            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2 py-1.5 rounded-xl transition-colors cursor-pointer inline-flex items-center gap-0.5"
+                            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer inline-flex items-center gap-0.5"
                             title="ไปคลังแผนก"
                           >
                             <span>คลัง</span>
@@ -543,7 +544,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 })
               ) : (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400 font-medium text-sm">
+                  <td colSpan={7} className="py-12 text-center text-slate-400 font-medium text-sm">
                     ไม่พบรายการสินค้าที่ตรงกับเงื่อนไขการค้นหา
                   </td>
                 </tr>

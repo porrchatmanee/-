@@ -960,7 +960,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-full flex flex-col pt-6 md:pt-10">
+    <div className="p-4 sm:p-6 md:p-8 w-full max-w-full min-h-full flex flex-col">
       
       {/* Header with Title and Custom Modern Tabs */}
       <header className="mb-6">
@@ -1349,14 +1349,14 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                                   className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-0.5 rounded-full border border-indigo-200 cursor-pointer inline-flex items-center gap-1 transition-all"
                                   title="คลิกเพื่อดูล็อตย่อยและวันหมดอายุแต่ละล็อต"
                                 >
-                                  <Tag size={10} />
-                                  <span>{item.lots.length} ล็อต (คลิกดู)</span>
+                                  <Tag size={10} className="shrink-0" />
+                                  <span className="whitespace-nowrap">{item.lots.length} ล็อต (คลิกดู)</span>
                                 </button>
                               </div>
                             )}
                           </td>
-                          <td className="py-3.5 text-center">
-                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${status.class}`}>
+                          <td className="py-3.5 text-center whitespace-nowrap">
+                            <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-2xs ${status.class}`}>
                               {status.label}
                             </span>
                           </td>
@@ -1470,36 +1470,58 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
             <div className="overflow-x-auto font-sans">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-100 text-slate-500 text-sm font-bold">
-                    <th className="p-5 pl-6 w-24">รหัส</th>
-                    <th className="p-5">รายการ</th>
-                    <th className="p-5 text-center w-32">คงเหลือ</th>
-                    <th className="p-5 text-center w-36">เกณฑ์ Min - Max</th>
-                    <th className="p-5 text-center w-40">วันหมดอายุ</th>
-                    <th className="p-5 text-center w-32">สถานะ</th>
-                    <th className="p-5 text-center w-48 pr-6">จัดการ</th>
+                  <tr className="border-b border-slate-100 text-slate-500 text-xs font-bold uppercase tracking-wider bg-slate-50/50">
+                    <th className="py-4.5 px-5 pl-6">รายการสินค้า & รหัสบาร์โค้ด</th>
+                    <th className="py-4.5 px-4 text-center w-28 whitespace-nowrap">คงเหลือ</th>
+                    <th className="py-4.5 px-4 text-center w-40 whitespace-nowrap">เกณฑ์ Min - Max</th>
+                    <th className="py-4.5 px-4 text-center w-36 whitespace-nowrap">วันหมดอายุ</th>
+                    <th className="py-4.5 px-4 text-center w-32 whitespace-nowrap">สถานะ</th>
+                    <th className="py-4.5 px-4 text-center w-44 pr-6 whitespace-nowrap">จัดการ</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-slate-100/70">
                   {filteredItems.map((item, idx) => {
                     const status = getStatus(item);
                     const itemKey = itemViewMode === 'grouped' ? `grouped_${(item as any).key || item.id}_${idx}` : `split_${item.id}_${idx}`;
                     return (
-                      <tr key={itemKey} className="hover:bg-slate-50/50 transition-colors group">
-                        <td className="p-5 pl-6 text-slate-400 font-mono text-sm font-medium">
-                          {item.id}
+                      <tr key={itemKey} className="hover:bg-slate-50/70 transition-colors group">
+                        {/* Item Name & Barcode/ID in a unified, well-proportioned primary column */}
+                        <td className="py-4 px-5 pl-6">
+                          <div className="flex flex-col gap-1 w-full">
+                            <span className="font-bold text-slate-800 text-sm leading-snug break-words">
+                              {item.name}
+                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span 
+                                className="font-mono text-[11px] font-semibold text-slate-500 bg-slate-100/90 hover:bg-slate-200/80 px-2 py-0.5 rounded-md border border-slate-200/80 transition-colors inline-flex items-center gap-1 cursor-default max-w-full"
+                                title={`รหัสสินค้า / บาร์โค้ด: ${item.id}`}
+                              >
+                                <span className="text-[10px] text-slate-400 font-sans">รหัส:</span>
+                                <span className="truncate">{item.id}</span>
+                              </span>
+                              {item.lots && item.lots.length > 1 && (
+                                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-1.5 py-0.5 rounded-md whitespace-nowrap">
+                                  {item.lots.length} ล็อต
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </td>
-                        <td className="p-5 font-bold text-slate-700">
-                          {item.name}
+
+                        {/* Quantity */}
+                        <td className="py-4 px-4 text-center whitespace-nowrap">
+                          <div className="inline-flex items-baseline justify-center gap-1">
+                            <span className="font-black text-slate-900 text-base">{item.quantity}</span>
+                            <span className="text-xs text-slate-400 font-medium">{item.unit}</span>
+                          </div>
                         </td>
-                        <td className="p-5 text-center">
-                          <span className="font-bold text-slate-800">{item.quantity}</span> <span className="text-slate-400 text-sm">{item.unit}</span>
-                        </td>
-                        <td className="p-5 text-center">
+
+                        {/* Min - Max criteria */}
+                        <td className="py-4 px-4 text-center whitespace-nowrap">
                           <button
                             type="button"
                             onClick={() => openEditModal(item)}
-                            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 px-3 py-1.5 rounded-xl border border-slate-200 transition-all cursor-pointer group"
+                            className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 px-3 py-1.5 rounded-xl border border-slate-200 transition-all cursor-pointer whitespace-nowrap group"
                             title="คลิกเพื่อแก้ไขเกณฑ์ Min - Max"
                           >
                             <span className="text-amber-700 font-mono font-bold">Min: {item.minStock ?? 10}</span>
@@ -1508,40 +1530,44 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                             <Edit size={12} className="text-slate-400 group-hover:text-indigo-600 ml-0.5" />
                           </button>
                         </td>
-                        <td className="p-5 text-center text-slate-500 text-sm font-semibold">
-                          <div>
-                            {item.expiryDate ? (
-                              <span className="font-bold text-slate-700">{formatThaiDate(item.expiryDate)}</span>
-                            ) : (
-                              <span className="text-slate-300">-</span>
+
+                        {/* Expiry Date & Lots */}
+                        <td className="py-4 px-4 text-center whitespace-nowrap">
+                          <div className="flex flex-col items-center justify-center gap-1">
+                            <span className="font-bold text-slate-700 text-sm whitespace-nowrap">
+                              {item.expiryDate ? formatThaiDate(item.expiryDate) : '-'}
+                            </span>
+                            {item.lots && item.lots.length >= 1 && (
+                              <button
+                                type="button"
+                                onClick={() => setViewLotsItem(item)}
+                                className="inline-flex items-center justify-center gap-1 text-[11px] font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-0.5 rounded-full border border-indigo-200 transition-colors cursor-pointer whitespace-nowrap"
+                                title="คลิกเพื่อดูล็อตย่อยและวันหมดอายุของแต่ละล็อต"
+                              >
+                                <Tag size={10} className="shrink-0" />
+                                <span className="whitespace-nowrap">{item.lots.length} ล็อต (คลิกดู)</span>
+                              </button>
                             )}
                           </div>
-                          {item.lots && item.lots.length >= 1 && (
-                            <button
-                              type="button"
-                              onClick={() => setViewLotsItem(item)}
-                              className="mt-1 inline-flex items-center gap-1 text-[11px] font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-0.5 rounded-full border border-indigo-200 transition-colors cursor-pointer"
-                              title="คลิกเพื่อดูล็อตย่อยและวันหมดอายุของแต่ละล็อต"
-                            >
-                              <Tag size={10} />
-                              <span>{item.lots.length} ล็อต (คลิกดู)</span>
-                            </button>
-                          )}
                         </td>
-                        <td className="p-5 text-center">
-                          <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${status.class}`}>
+
+                        {/* Status Badge - Single neat line */}
+                        <td className="py-4 px-4 text-center whitespace-nowrap">
+                          <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-2xs ${status.class}`}>
                             {status.label}
                           </span>
                         </td>
-                        <td className="p-5 text-center pr-6">
-                          <div className="flex items-center justify-center gap-1.5 w-fit mx-auto">
+
+                        {/* Actions */}
+                        <td className="py-4 px-4 text-center pr-6 whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-1.5 w-fit mx-auto whitespace-nowrap">
                             <button 
                               onClick={() => {
                                 setAdjustItem(item);
                                 setAdjustType('RECEIVE');
                                 setIsAdjustModalOpen(true);
                               }}
-                              className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition-all border border-emerald-100 active:scale-95" 
+                              className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition-all border border-emerald-100 active:scale-95 cursor-pointer" 
                               title="รับเข้า"
                             >
                               <ArrowDownLeft size={16} />
@@ -1552,20 +1578,16 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                                 setAdjustType('ISSUE');
                                 setIsAdjustModalOpen(true);
                               }}
-                              className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center hover:bg-rose-100 transition-all border border-rose-100 active:scale-95" 
+                              className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center hover:bg-rose-100 transition-all border border-rose-100 active:scale-95 cursor-pointer" 
                               title="เบิกจ่าย"
                             >
                               <ArrowUpRight size={16} />
                             </button>
-                            <div className="w-[1px] h-6 bg-slate-200 mx-1"></div>
+                            <div className="w-px h-6 bg-slate-200 mx-1"></div>
                             <button 
-                              onClick={() => {
-                                setDirectEditItem(item);
-                                setDirectEditQty(item.quantity);
-                                setIsDirectEditModalOpen(true);
-                              }}
-                              className="w-9 h-9 rounded-xl bg-slate-50 text-slate-500 flex items-center justify-center hover:bg-slate-100 hover:text-indigo-600 transition-all border border-slate-100 active:scale-95" 
-                              title="แก้ไขยอด"
+                              onClick={() => openEditModal(item)}
+                              className="w-9 h-9 rounded-xl bg-slate-50 text-slate-500 flex items-center justify-center hover:bg-slate-100 hover:text-indigo-600 transition-all border border-slate-100 active:scale-95 cursor-pointer" 
+                              title="แก้ไขข้อมูลสินค้าและเกณฑ์ Min - Max"
                             >
                               <Edit size={16} />
                             </button>
