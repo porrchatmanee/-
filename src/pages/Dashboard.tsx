@@ -6,7 +6,8 @@ import { formatThaiDate } from '../lib/lots';
 import { 
   ArrowRight, PackageOpen, AlertCircle, Search, Package, 
   Tag, Clock, Layers, CheckCircle2, AlertTriangle, X, 
-  HelpCircle, Sparkles, Filter, ChevronRight, Edit, SlidersHorizontal, Target, Save
+  HelpCircle, Sparkles, Filter, ChevronRight, Edit, SlidersHorizontal, Target, Save,
+  FileText, Printer
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -115,8 +116,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </p>
         </div>
 
-        {/* Global Stock Stats Badges */}
+        {/* Global Stock Stats Badges & Reports Button */}
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => onNavigate('reports')}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-2xl font-bold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer"
+          >
+            <Printer size={16} />
+            <span>ออกรายงาน &amp; พิมพ์ A4</span>
+          </button>
+
           <div className="bg-white border border-slate-200/80 rounded-2xl px-4 py-2 shadow-xs">
             <span className="text-[10px] font-bold text-slate-400 block uppercase">สินค้าทั้งหมด</span>
             <span className="text-lg font-black text-slate-800">{totalAllItems} <span className="text-xs text-slate-500 font-bold">รายการ</span></span>

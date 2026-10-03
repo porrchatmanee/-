@@ -161,6 +161,20 @@ export function getEarliestLotExpiry(lots: ItemLot[]): string | undefined {
 }
 
 /**
+ * Returns the number of days until a given expiration date
+ */
+export function getDaysUntilExpiry(dateStr?: string): number {
+  if (!dateStr) return 9999;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr);
+  if (isNaN(target.getTime())) return 9999;
+  target.setHours(0, 0, 0, 0);
+  const diffTime = target.getTime() - now.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+/**
  * Formats date into Thai locale standard (e.g. "12 ต.ค. 69")
  */
 export function formatThaiDate(dateStr?: string): string {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, ScanLine, LayoutDashboard, Settings, Layers, RotateCcw } from 'lucide-react';
+import { Package, ScanLine, LayoutDashboard, Settings, Layers, RotateCcw, FileText, Printer } from 'lucide-react';
 import { CATEGORIES } from '../lib/constants';
 import { useInventory } from '../lib/store';
 
@@ -49,6 +49,18 @@ export function Sidebar({ currentView, onNavigate, onOpenScanner }: SidebarProps
         >
           <LayoutDashboard size={18} />
           <span>ภาพรวม (Dashboard)</span>
+        </button>
+
+        <button
+          onClick={() => onNavigate('reports')}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${
+            currentView === 'reports'
+              ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-100'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+          }`}
+        >
+          <FileText size={18} className={currentView === 'reports' ? 'text-indigo-600' : ''} />
+          <span>รายงานและพิมพ์ (Reports)</span>
         </button>
 
         <div className="mt-8 mb-3 px-3 flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">

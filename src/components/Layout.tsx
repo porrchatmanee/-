@@ -4,6 +4,7 @@ import { ScannerModal } from './ScannerModal';
 import { Dashboard } from '../pages/Dashboard';
 import { CategoryView } from '../pages/CategoryView';
 import { SettingsPage } from '../pages/SettingsPage';
+import { ReportsPage } from '../pages/ReportsPage';
 import { InventoryProvider, useInventory } from '../lib/store';
 import { Menu, X, AlertCircle, RefreshCcw } from 'lucide-react';
 import { normalizeBarcode } from '../lib/barcode';
@@ -77,10 +78,10 @@ export function LayoutContent() {
   }, []);
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans overflow-hidden text-slate-800 w-full">
+    <div className="flex h-screen bg-slate-50 font-sans overflow-hidden text-slate-800 w-full print:h-auto print:overflow-visible print:bg-white">
       
       {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-100 flex items-center justify-between px-4 z-40">
+      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-100 flex items-center justify-between px-4 z-40 print:hidden">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 md:w-10 md:h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-500 font-bold">
             SJ
@@ -105,7 +106,7 @@ export function LayoutContent() {
       {/* Mobile Sidebar Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-slate-900/50 z-40 md:hidden"
+          className="fixed inset-0 bg-slate-900/50 z-40 md:hidden print:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
@@ -113,7 +114,7 @@ export function LayoutContent() {
       {/* Sidebar Container */}
       <div className={`
         fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out
-        md:relative md:translate-x-0 bg-white shrink-0
+        md:relative md:translate-x-0 bg-white shrink-0 print:hidden
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <Sidebar 
@@ -128,11 +129,11 @@ export function LayoutContent() {
       </div>
       
       {/* Container holding Banners + Content */}
-      <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+      <div className="flex flex-col flex-1 overflow-hidden min-w-0 print:overflow-visible print:h-auto">
         
         {/* Global Supabase DB Alert Notification */}
         {dbError && (
-          <div className="bg-rose-50 border-b border-rose-200 px-5 py-3 flex flex-wrap items-center justify-between text-rose-900 text-xs md:text-sm font-bold z-50 shadow-sm animate-fade-in gap-3">
+          <div className="bg-rose-50 border-b border-rose-200 px-5 py-3 flex flex-wrap items-center justify-between text-rose-900 text-xs md:text-sm font-bold z-50 shadow-sm animate-fade-in gap-3 print:hidden">
             <div className="flex items-center gap-2.5 max-w-[85%]">
               <AlertCircle size={18} className="text-rose-500 shrink-0" />
               <span className="leading-relaxed">⚠️ ขัดข้องเกี่ยวกับการบันทึกออนไลน์: {dbError}</span>
@@ -173,8 +174,9 @@ export function LayoutContent() {
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto pt-16 md:pt-0 w-full relative">
+        <main className="flex-1 overflow-y-auto pt-16 md:pt-0 w-full relative print:p-0 print:overflow-visible">
           {currentView === 'dashboard' && <Dashboard onNavigate={handleNavigate} />}
+          {currentView === 'reports' && <ReportsPage />}
           {currentView.startsWith('category_') && (
             <CategoryView categoryId={currentView.replace('category_', '')} />
           )}
