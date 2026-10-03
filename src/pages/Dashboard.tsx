@@ -493,8 +493,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                           )}
                         </div>
 
-                        {/* If multiple lots exist, show tag */}
-                        {item.lots && item.lots.length > 1 ? (
+                        {/* Always allow viewing lot details if lots exist */}
+                        {item.lots && item.lots.length >= 1 && (
                           <div className="mt-1">
                             <button
                               type="button"
@@ -505,10 +505,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                               <Tag size={10} />
                               <span>{item.lots.length} ล็อต (คลิกดู)</span>
                             </button>
-                          </div>
-                        ) : item.lots && item.lots.length === 1 && (
-                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                            {item.lots[0].lotNumber}
                           </div>
                         )}
                       </td>

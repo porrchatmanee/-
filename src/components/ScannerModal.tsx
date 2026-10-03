@@ -30,6 +30,7 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
   const [selectedItemId, setSelectedItemId] = useState<string>('');
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [isManualIssue, setIsManualIssue] = useState<boolean>(false);
 
   // Camera states
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false); 
@@ -96,6 +97,8 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
       setScannedCode('');
       setQuantity(1);
       setExpiryDate('');
+      setScanLotNumber('');
+      setIsManualIssue(false);
       setOperator('พยาบาล');
       setSelectedItemId('');
       setError('');
@@ -155,6 +158,8 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
         setScannedCode(foundItem.id);
         setSelectedItemId(foundItem.id);
         setQuantity(1);
+        setIsManualIssue(false);
+        setScanLotNumber('');
         if (foundItem.expiryDate) {
           setExpiryDate(foundItem.expiryDate);
         }
@@ -180,6 +185,8 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
   // Sync manual dropdown selection with scanned code
   const handleDropdownChange = (itemId: string) => {
     setSelectedItemId(itemId);
+    setIsManualIssue(false);
+    setScanLotNumber('');
     if (itemId) {
       const match = items.find(i => i.id === itemId);
       if (match) {
@@ -445,6 +452,7 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
     setQuantity(1);
     setScanLotNumber('');
     setExpiryDate('');
+    setIsManualIssue(false);
     setIsRegistering(false);
     
     // Refocus raw input box automatically
@@ -1140,11 +1148,14 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
                   onClick={() => {
                     setMode('ISSUE');
                     setSuccessMsg('');
+                    setIsManualIssue(false);
+                    setScanLotNumber('');
+                    setExpiryDate('');
                   }}
                   className={`flex-1 flex justify-center items-center py-3.5 rounded-2xl font-black text-xs md:text-sm tracking-wider transition-all duration-200 shadow-sm active:scale-95 cursor-pointer ${
                     mode === 'ISSUE'
                       ? 'bg-[#fe155a] text-white shadow-lg shadow-pink-100 border border-[#fe155a]'
-                      : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200/50'
+                      : 'bg-slate-50 text-slate-500 hover:bg-slate-150 border border-slate-200/50'
                   }`}
                 >
                   เบิกออก
@@ -1154,11 +1165,14 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
                   onClick={() => {
                     setMode('RECEIVE');
                     setSuccessMsg('');
+                    setIsManualIssue(false);
+                    setScanLotNumber('');
+                    setExpiryDate('');
                   }}
                   className={`flex-1 flex justify-center items-center py-3.5 rounded-2xl font-black text-xs md:text-sm tracking-wider transition-all duration-200 shadow-sm active:scale-95 cursor-pointer ${
                     mode === 'RECEIVE'
                       ? 'bg-[#00c07f] text-white shadow-lg shadow-emerald-100 border border-[#00c07f]'
-                      : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200/50'
+                      : 'bg-slate-50 text-slate-500 hover:bg-slate-150 border border-slate-200/50'
                   }`}
                 >
                   รับเข้า
@@ -1433,40 +1447,87 @@ export function ScannerModal({ isOpen, onClose, currentView, initialCode = '' }:
                 </div>
               </div>
             ) : (
-              /* ISSUE MODE: FEFO Lot Deduction */
-              <div className="space-y-2">
-                {matchedItem?.lots && matchedItem.lots.length > 1 ? (
-                  <div className="space-y-1.5 bg-rose-50/50 border border-rose-200/80 rounded-2xl p-3">
-                    <div className="flex items-center justify-between text-xs font-bold text-rose-900">
-                      <span className="flex items-center gap-1.5">
-                        <Clock size={13} className="text-rose-600" />
-                        <span>เลือกล็อตที่ต้องการตัดจ่าย (FEFO)</span>
-                      </span>
-                      <span className="text-[10px] text-rose-600 bg-rose-100 px-2 py-0.5 rounded-full font-bold">
-                        แนะนำ: ล็อตหมดอายุก่อน
-                      </span>
-                    </div>
-
-                    <select
-                      value={scanLotNumber}
-                      onChange={(e) => setScanLotNumber(e.target.value)}
-                      className="w-full bg-white border border-rose-200 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-200"
-                    >
-                      <option value="">
-                        ⚡ อัตโนมัติ: ตัดจากล็อตหมดอายุเร็วที่สุดก่อน (FEFO: {matchedItem.lots[0].lotNumber} หมดอายุ {formatThaiDate(matchedItem.lots[0].expiryDate)})
-                      </option>
-                      {matchedItem.lots.map(lot => (
-                        <option key={lot.lotNumber} value={lot.lotNumber}>
-                          เจาะจงล็อต {lot.lotNumber} | หมดอายุ: {formatThaiDate(lot.expiryDate)} (คงเหลือ: {lot.quantity} {matchedItem.unit})
-                        </option>
-                      ))}
-                    </select>
-
-                    <p className="text-[10px] text-rose-700 leading-normal">
-                      🛡️ ระบบจะตัดจ่ายสต็อกจากล็อตที่หมดอายุเร็วที่สุดก่อนให้อัตโนมัติ เพื่อป้องกันสินค้าหมดอายุค้างคลัง
-                    </p>
+              /* ISSUE MODE: FEFO Lot Deduction & Custom Input */
+              <div className="space-y-3 pt-1">
+                <div className="space-y-1.5 bg-rose-50/50 border border-rose-200/80 rounded-2xl p-3.5 space-y-3">
+                  <div className="flex items-center justify-between text-xs font-bold text-rose-900">
+                    <span className="flex items-center gap-1.5">
+                      <Clock size={13} className="text-rose-600" />
+                      <span>เลือกล็อตที่ต้องการตัดจ่าย (FEFO)</span>
+                    </span>
+                    <span className="text-[10px] text-rose-600 bg-rose-100 px-2 py-0.5 rounded-full font-bold">
+                      มาตรฐานสากล
+                    </span>
                   </div>
-                ) : null}
+
+                  <select
+                    value={isManualIssue ? "__custom__" : scanLotNumber}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "__custom__") {
+                        setIsManualIssue(true);
+                        setScanLotNumber('');
+                        setExpiryDate('');
+                      } else {
+                        setIsManualIssue(false);
+                        setScanLotNumber(val);
+                        const matchedLot = matchedItem?.lots?.find(l => l.lotNumber === val);
+                        setExpiryDate(matchedLot?.expiryDate || '');
+                      }
+                    }}
+                    className="w-full bg-white border border-rose-200 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-200 h-10"
+                  >
+                    <option value="">
+                      {matchedItem?.lots && matchedItem.lots.length > 0 
+                        ? `⚡ อัตโนมัติ: ตัดจากล็อตหมดอายุเร็วที่สุดก่อน (FEFO: ${matchedItem.lots[0].lotNumber} หมดอายุ ${formatThaiDate(matchedItem.lots[0].expiryDate)})`
+                        : "⭐ ตัดล็อตหมดอายุเร็วสุดอัตโนมัติ (FEFO: แนะนำ)"
+                      }
+                    </option>
+                    {matchedItem?.lots && matchedItem.lots.map(lot => (
+                      <option key={lot.lotNumber} value={lot.lotNumber}>
+                        เจาะจงล็อต {lot.lotNumber} | หมดอายุ: {formatThaiDate(lot.expiryDate)} (คงเหลือ: {lot.quantity} {matchedItem.unit})
+                      </option>
+                    ))}
+                    <option value="__custom__">✏️ ระบุล็อตและวันหมดอายุเอง (ระบุด้วยตนเอง)</option>
+                  </select>
+
+                  {/* Manual Input Fields for Issue Mode */}
+                  {(isManualIssue || !matchedItem?.lots || matchedItem.lots.length <= 1) && (
+                    <div className="space-y-3 bg-white/80 p-3 rounded-xl border border-rose-100">
+                      <div className="text-[11px] font-bold text-rose-800 flex items-center gap-1.5">
+                        <Tag size={13} className="text-rose-600" />
+                        <span>กรอกล็อตและวันหมดอายุ (แบบระบุด้วยตนเอง)</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 block">หมายเลขล็อต (Lot No.)</label>
+                          <input
+                            type="text"
+                            placeholder="ระบุเลขล็อต..."
+                            value={scanLotNumber}
+                            onChange={(e) => setScanLotNumber(e.target.value)}
+                            className="w-full bg-slate-50 border border-rose-200 px-3.5 py-2 rounded-xl text-slate-800 font-mono text-xs font-bold focus:ring-2 focus:ring-rose-200 outline-none h-10"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 block">วันหมดอายุ (Expiry Date)</label>
+                          <input
+                            type="date"
+                            value={expiryDate}
+                            onChange={(e) => setExpiryDate(e.target.value)}
+                            className="w-full bg-slate-50 border border-rose-200 px-3.5 py-2 rounded-xl text-slate-800 text-xs font-bold focus:ring-2 focus:ring-rose-200 outline-none cursor-pointer h-10"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-rose-750 leading-normal">
+                    🛡️ ระบบจะบันทึกการตัดจ่ายตามล็อตที่เลือกหรือกรอกข้อมูล และตัดจ่ายสต็อกจากล็อตดังกล่าวตามประวัติ
+                  </p>
+                </div>
               </div>
             )}
 

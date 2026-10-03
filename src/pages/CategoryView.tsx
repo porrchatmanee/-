@@ -24,6 +24,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
   const [adjustQty, setAdjustQty] = useState(1);
   const [adjustExpiry, setAdjustExpiry] = useState('');
   const [adjustLot, setAdjustLot] = useState('');
+  const [isManualIssue, setIsManualIssue] = useState<boolean>(false);
   const [viewLotsItem, setViewLotsItem] = useState<InventoryItem | null>(null);
 
   const [isDirectEditModalOpen, setIsDirectEditModalOpen] = useState(false);
@@ -796,6 +797,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
     setAdjustQty(1);
     setAdjustExpiry('');
     setAdjustLot('');
+    setIsManualIssue(false);
   };
 
   const openEditModal = (item: InventoryItem) => {
@@ -1212,7 +1214,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                             ) : (
                               <span className="text-slate-300">-</span>
                             )}
-                            {item.lots && item.lots.length > 1 && (
+                            {item.lots && item.lots.length >= 1 && (
                               <div className="mt-1">
                                 <button
                                   type="button"
@@ -1368,7 +1370,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                               <span className="text-slate-300">-</span>
                             )}
                           </div>
-                          {item.lots && item.lots.length > 1 && (
+                          {item.lots && item.lots.length >= 1 && (
                             <button
                               type="button"
                               onClick={() => setViewLotsItem(item)}
@@ -1376,7 +1378,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                               title="คลิกเพื่อดูล็อตย่อยและวันหมดอายุของแต่ละล็อต"
                             >
                               <Tag size={10} />
-                              <span>{item.lots.length} ล็อต</span>
+                              <span>{item.lots.length} ล็อต (คลิกดู)</span>
                             </button>
                           )}
                         </td>
@@ -2064,30 +2066,71 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                 </div>
               ) : (
                 <div className="space-y-3 pt-1">
-                  {adjustItem.lots && adjustItem.lots.length > 1 ? (
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-550 block">เลือกล็อตที่ต้องการเบิกจ่าย</label>
-                      <select
-                        value={adjustLot}
-                        onChange={(e) => setAdjustLot(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-slate-800"
-                      >
-                        <option value="">⭐ ตัดล็อตหมดอายุเร็วสุดอัตโนมัติ (FEFO: แนะนำ)</option>
-                        {adjustItem.lots.map(l => (
-                          <option key={l.lotNumber} value={l.lotNumber}>
-                            ล็อต: {l.lotNumber} | หมดอายุ: {formatThaiDate(l.expiryDate)} (คงเหลือ: {l.quantity} {adjustItem.unit})
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-[11px] text-slate-500 bg-rose-50/60 p-2.5 rounded-xl border border-rose-100/80 leading-relaxed">
-                        💡 <strong>มาตรฐานสากล FEFO:</strong> ระบบจะตัดสินค้าจากล็อตที่หมดอายุเร็วที่สุดออกไปก่อนเสมอ เพื่อไม่ให้มีของค้างสต็อกจนหมดอายุ
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="p-3 bg-slate-50 rounded-xl text-xs text-slate-500">
-                      วันหมดอายุของสต็อกปัจจุบัน: <strong className="text-slate-800">{formatThaiDate(adjustItem.expiryDate || '')}</strong>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-550 block">เลือกล็อตที่ต้องการเบิกจ่าย</label>
+                    <select
+                      value={isManualIssue ? "__custom__" : adjustLot}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "__custom__") {
+                          setIsManualIssue(true);
+                          setAdjustLot('');
+                          setAdjustExpiry('');
+                        } else {
+                          setIsManualIssue(false);
+                          setAdjustLot(val);
+                          const matchedLot = adjustItem.lots?.find(l => l.lotNumber === val);
+                          setAdjustExpiry(matchedLot?.expiryDate || '');
+                        }
+                      }}
+                      className="w-full bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-rose-500/20 text-slate-800"
+                    >
+                      <option value="">⭐ ตัดล็อตหมดอายุเร็วสุดอัตโนมัติ (FEFO: แนะนำ)</option>
+                      {adjustItem.lots && adjustItem.lots.map(l => (
+                        <option key={l.lotNumber} value={l.lotNumber}>
+                          ล็อต: {l.lotNumber} | หมดอายุ: {formatThaiDate(l.expiryDate)} (คงเหลือ: {l.quantity} {adjustItem.unit})
+                        </option>
+                      ))}
+                      <option value="__custom__">✏️ ระบุล็อตและวันหมดอายุเอง (ระบุด้วยตนเอง)</option>
+                    </select>
+                  </div>
+
+                  {/* Manual input if isManualIssue or no lots exist */}
+                  {(isManualIssue || !adjustItem.lots || adjustItem.lots.length <= 1) && (
+                    <div className="space-y-3 bg-rose-50/40 p-3 rounded-2xl border border-rose-100/50">
+                      <div className="text-[11px] font-bold text-rose-800 flex items-center gap-1.5">
+                        <Tag size={13} className="text-rose-600" />
+                        <span>ระบุล็อตและวันหมดอายุเองสำหรับเบิกจ่าย</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 block">หมายเลขล็อต (Lot No.)</label>
+                          <input
+                            type="text"
+                            placeholder="ระบุเลขล็อต..."
+                            value={adjustLot}
+                            onChange={(e) => setAdjustLot(e.target.value)}
+                            className="w-full bg-white border border-rose-200 px-3.5 py-2.5 rounded-xl text-slate-800 font-mono text-xs font-bold focus:ring-2 focus:ring-rose-200 outline-none h-10"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 block">วันหมดอายุ (Expiry Date)</label>
+                          <input
+                            type="date"
+                            value={adjustExpiry}
+                            onChange={(e) => setAdjustExpiry(e.target.value)}
+                            className="w-full bg-white border border-rose-200 px-3.5 py-2 rounded-xl text-slate-800 text-xs font-bold focus:ring-2 focus:ring-rose-200 outline-none cursor-pointer h-10"
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
+
+                  <p className="text-[11px] text-slate-550 bg-rose-50/60 p-2.5 rounded-xl border border-rose-100/80 leading-relaxed">
+                    💡 <strong>มาตรฐานสากล FEFO:</strong> หากไม่ระบุเฉพาะเจาะจง ระบบจะตัดสินค้าจากล็อตที่หมดอายุเร็วที่สุดออกไปก่อนเสมอ เพื่อไม่ให้มีของค้างสต็อกจนหมดอายุ
+                  </p>
                 </div>
               )}
 
