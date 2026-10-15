@@ -96,35 +96,104 @@ export function getCategoryVisual(categoryId: string): CategoryVisualMeta {
 }
 
 /**
- * Cute Mascot Badge with Nurse Cartoon Mascot and sparkles
+ * Universal Vector Cute Cartoon Nurse Icon (Works 100% offline & on all platforms/versions)
+ */
+export function CuteNurseVector({ size = 32 }: { size?: number }) {
+  return (
+    <svg 
+      width={size} 
+      height={size} 
+      viewBox="0 0 48 48" 
+      fill="none" 
+      xmlns="http://www.w3.org/2000/svg"
+      className="shrink-0 select-none"
+    >
+      {/* Background Soft Pastel Gradient Disc */}
+      <circle cx="24" cy="24" r="22" fill="url(#nurse-grad-bg)" />
+
+      {/* Hair Behind */}
+      <path d="M12 25 C12 37 36 37 36 25 C36 15 12 15 12 25 Z" fill="#5A3825" />
+
+      {/* Cute Head / Face */}
+      <circle cx="24" cy="26" r="11" fill="#FFE2D1" />
+
+      {/* Hair Bangs (Cute Anime Chibi Style) */}
+      <path d="M13 23 C17 19 22 21 24 23 C26 21 31 19 35 23 C35 17 13 17 13 23 Z" fill="#6E442D" />
+      <path d="M13 23 C13 27 15 31 16 32 C15 29 14 26 14 23 Z" fill="#5A3825" />
+      <path d="M35 23 C35 27 33 31 32 32 C33 29 34 26 34 23 Z" fill="#5A3825" />
+
+      {/* Blushing Pink Cheeks */}
+      <circle cx="18" cy="29" r="2.2" fill="#FF8FAB" opacity="0.65" />
+      <circle cx="30" cy="29" r="2.2" fill="#FF8FAB" opacity="0.65" />
+
+      {/* Big Cheerful Sparkly Eyes */}
+      <ellipse cx="19" cy="25.5" rx="1.8" ry="2.2" fill="#1E293B" />
+      <ellipse cx="29" cy="25.5" rx="1.8" ry="2.2" fill="#1E293B" />
+      {/* Eye Highlights */}
+      <circle cx="18.3" cy="24.8" r="0.8" fill="#FFFFFF" />
+      <circle cx="28.3" cy="24.8" r="0.8" fill="#FFFFFF" />
+      <circle cx="19.5" cy="26.3" r="0.4" fill="#FFFFFF" />
+      <circle cx="29.5" cy="26.3" r="0.4" fill="#FFFFFF" />
+
+      {/* Sweet Smile */}
+      <path d="M22 28.5 Q24 30.8 26 28.5" stroke="#E11D48" strokeWidth="1.3" strokeLinecap="round" fill="none" />
+
+      {/* Pastel Scrubs Uniform & White Collar */}
+      <path d="M16 36 C16 34 19 33 24 33 C29 33 32 34 32 36 L34 45 L14 45 Z" fill="#38BDF8" />
+      <path d="M21 33 L24 36 L27 33" stroke="#FFFFFF" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+
+      {/* Cute Mini Stethoscope */}
+      <path d="M18 34.5 C18 40.5 30 40.5 30 34.5" stroke="#E2E8F0" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+      <circle cx="24" cy="39.5" r="1.5" fill="#CBD5E1" stroke="#94A3B8" strokeWidth="0.8" />
+
+      {/* Nurse Cap */}
+      <path d="M15 16 C16 10 32 10 33 16 C33 17 31 18 24 18 C17 18 15 17 15 16 Z" fill="#FFFFFF" />
+      <path d="M17 16 C17 11.5 31 11.5 31 16 Z" fill="#F8FAFC" />
+
+      {/* Pink Medical Cross on Cap */}
+      <path d="M24 12.8 V16.2 M22.3 14.5 H25.7" stroke="#F43F5E" strokeWidth="1.5" strokeLinecap="round" />
+
+      {/* Little Sparkle Accent */}
+      <path d="M38 12 L39 10 L40 12 L42 13 L40 14 L39 16 L38 14 L36 13 Z" fill="#FBBF24" />
+
+      <defs>
+        <linearGradient id="nurse-grad-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#FEE2E2" />
+          <stop offset="0.5" stopColor="#EDE9FE" />
+          <stop offset="1" stopColor="#E0F2FE" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
+/**
+ * Cute Mascot Badge with Universal Nurse Cartoon Vector and modern youthful frame
  */
 export function MascotAvatar({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
-  const [hasImgError, setHasImgError] = React.useState(false);
-
   const sizeClasses = {
     sm: 'w-8 h-8 rounded-xl',
     md: 'w-11 h-11 rounded-2xl',
     lg: 'w-16 h-16 rounded-3xl',
   };
 
+  const svgSizes = {
+    sm: 26,
+    md: 38,
+    lg: 56,
+  };
+
   return (
     <div className="relative inline-flex items-center justify-center shrink-0">
-      <div className={`${sizeClasses[size]} overflow-hidden bg-gradient-to-tr from-pink-200 via-rose-100 to-indigo-100 flex items-center justify-center shadow-md shadow-pink-200/60 ring-2 ring-white/90 select-none group`}>
-        {!hasImgError ? (
-          <img 
-            src="/src/assets/images/cute_nurse_avatar_1792051870546.jpg" 
-            alt="การ์ตูนพยาบาลสุขใจ" 
-            referrerPolicy="no-referrer"
-            onError={() => setHasImgError(true)}
-            className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-300"
-          />
-        ) : (
-          <span className="transform group-hover:scale-110 transition-transform text-lg select-none">
-            👩‍⚕️
-          </span>
-        )}
+      <div 
+        className={`${sizeClasses[size]} bg-gradient-to-tr from-pink-400 via-violet-400 to-indigo-500 p-0.5 flex items-center justify-center shadow-md shadow-pink-200/70 ring-2 ring-white/90 select-none group cursor-pointer hover:scale-105 active:scale-95 transition-all duration-200`}
+        title="พยาบาลสุขใจ (มาสคอตประจำวอร์ด)"
+      >
+        <div className="w-full h-full rounded-[inherit] bg-white flex items-center justify-center overflow-hidden">
+          <CuteNurseVector size={svgSizes[size]} />
+        </div>
       </div>
-      <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white shadow-2xs text-[9px] border border-pink-100">
+      <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white shadow-2xs text-[9px] border border-pink-100 select-none">
         💖
       </span>
     </div>

@@ -18,7 +18,7 @@ interface SidebarProps {
 
 export function Sidebar({ currentView, onNavigate, onOpenScanner }: SidebarProps) {
   const { isOnline, isSyncing, borrowRecords, isSecretUnlocked } = useInventory();
-  const { fontSize, setFontSize } = useTheme();
+  const { fontSize, setFontSize, fontStyle, setFontStyle } = useTheme();
 
   const activeBorrowedCount = (borrowRecords || []).filter(r => r.status !== 'RETURNED').length;
 
@@ -217,11 +217,54 @@ export function Sidebar({ currentView, onNavigate, onOpenScanner }: SidebarProps
       {/* Footer System Status & Quick Font Size */}
       <div className="p-3 border-t border-indigo-50/80 bg-slate-50/60">
         
+        {/* Quick Font Style Switcher */}
+        <div className="mb-2 bg-white rounded-2xl p-2 border border-slate-150/80 shadow-2xs flex items-center justify-between">
+          <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1 pl-1">
+            <Sparkles size={13} className="text-pink-500" />
+            <span>ฟอนต์:</span>
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setFontStyle('mitr')}
+              className={`px-2 py-1 rounded-xl text-[10px] font-black transition-all cursor-pointer ${
+                fontStyle === 'mitr'
+                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-2xs'
+                  : 'text-slate-500 hover:bg-slate-100'
+              }`}
+              title="ฟอนต์มิตร (Mitr) - สไตล์วัยรุ่น น่ารัก มนละมุน อ่านง่าย สบายตา"
+            >
+              🌸 มิตร
+            </button>
+            <button
+              onClick={() => setFontStyle('prompt')}
+              className={`px-2 py-1 rounded-xl text-[10px] font-black transition-all cursor-pointer ${
+                fontStyle === 'prompt'
+                  ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:bg-slate-100'
+              }`}
+              title="ฟอนต์พร้อมท์ (Prompt) - โมเดิร์น คมชัด ทันสมัย สากล"
+            >
+              ⚡ พร้อมท์
+            </button>
+            <button
+              onClick={() => setFontStyle('ibm')}
+              className={`px-2 py-1 rounded-xl text-[10px] font-black transition-all cursor-pointer ${
+                fontStyle === 'ibm'
+                  ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:bg-slate-100'
+              }`}
+              title="ฟอนต์ไอบีเอ็ม (IBM Plex) - สบายตา ชัดเจน อ่านยาวๆ ไม่ล้า"
+            >
+              🌿 เพล็กซ์
+            </button>
+          </div>
+        </div>
+
         {/* Quick Text Size Switcher with Cute Icons */}
         <div className="mb-2 bg-white rounded-2xl p-2 border border-slate-150/80 shadow-2xs flex items-center justify-between">
           <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1 pl-1">
             <Glasses size={13} className="text-violet-500" />
-            <span>ตัวอักษร:</span>
+            <span>ขนาด:</span>
           </span>
           <div className="flex items-center gap-1">
             <button

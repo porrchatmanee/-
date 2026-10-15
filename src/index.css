@@ -1,8 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Mitr:wght@300;400;500;600&family=Prompt:wght@300;400;500;600;700;800&family=Kanit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Mitr:wght@300;400;500;600&family=Prompt:wght@300;400;500;600;700;800&family=Kanit:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Prompt", "Mitr", "Kanit", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Mitr", "Prompt", "IBM Plex Sans Thai", ui-sans-serif, system-ui, sans-serif;
   --font-cute: "Mitr", "Fredoka", "Prompt", sans-serif;
 }
 
@@ -25,11 +25,33 @@ html[data-font-size="xlarge"] {
   font-size: 20px;
 }
 
+/* Font styles */
+html[data-font-style="mitr"] body,
+html[data-font-style="mitr"] * {
+  font-family: "Mitr", "Fredoka", sans-serif !important;
+}
+
+html[data-font-style="prompt"] body,
+html[data-font-style="prompt"] * {
+  font-family: "Prompt", sans-serif !important;
+}
+
+html[data-font-style="ibm"] body,
+html[data-font-style="ibm"] * {
+  font-family: "IBM Plex Sans Thai", sans-serif !important;
+}
+
+html[data-font-style="kanit"] body,
+html[data-font-style="kanit"] * {
+  font-family: "Kanit", sans-serif !important;
+}
+
 /* Cute typography & smooth rendering */
 body {
   font-family: var(--font-sans);
   font-size: 1rem;
   line-height: 1.6;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f8fafc;
@@ -58,42 +80,29 @@ body {
   transform: translateY(-2px);
 }
 
-.cute-button-bouncy {
-  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.cute-button-bouncy:active {
-  transform: scale(0.95);
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-/* Custom cute scrollbar */
-::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
-}
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 9999px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
 
-/* Hide scrollbar for category tabs */
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
-}
-
-/* Print Landscape for reports and wide tables */
-@media print {
-  @page {
-    size: landscape;
-    margin: 10mm;
-  }
 }

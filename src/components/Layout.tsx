@@ -183,17 +183,58 @@ export function LayoutContent() {
             </div>
           </div>
 
-          {/* Right: Modern Font Size Presets & Quick Action */}
-          <div className="flex items-center gap-3">
+          {/* Right: Modern Font Selector, Font Size Presets & Quick Action */}
+          <div className="flex items-center gap-2.5">
+            {/* Font Style Switcher */}
+            <div className="hidden xl:flex items-center gap-1 bg-slate-100/80 p-1 rounded-2xl border border-slate-200/60 shadow-2xs">
+              <span className="text-[11px] font-black text-slate-500 px-2 flex items-center gap-1">
+                <Sparkles size={12} className="text-pink-500" />
+                <span>ฟอนต์:</span>
+              </span>
+              <button
+                onClick={() => setFontStyle('mitr')}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  fontStyle === 'mitr'
+                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="ฟอนต์มิตร (Mitr) - วัยรุ่น น่ารัก มนละมุน อ่านง่าย สบายตาสุดๆ"
+              >
+                🌸 มิตร (Mitr)
+              </button>
+              <button
+                onClick={() => setFontStyle('prompt')}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  fontStyle === 'prompt'
+                    ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="ฟอนต์พร้อมท์ (Prompt) - โมเดิร์น คมชัด ทันสมัย ยอดนิยม"
+              >
+                ⚡ พร้อมท์ (Prompt)
+              </button>
+              <button
+                onClick={() => setFontStyle('ibm')}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  fontStyle === 'ibm'
+                    ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="ฟอนต์ไอบีเอ็ม (IBM Plex) - สบายตา อ่านง่าย มินิมอล"
+              >
+                🌿 IBM Plex
+              </button>
+            </div>
+
             {/* Font Size Mode Switcher */}
-            <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-2xl border border-slate-200/60">
-              <span className="text-[11px] font-bold text-slate-500 px-2 flex items-center gap-1">
+            <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-2xl border border-slate-200/60 shadow-2xs">
+              <span className="text-[11px] font-black text-slate-500 px-2 flex items-center gap-1">
                 <Glasses size={13} className="text-violet-500" />
-                <span>ตัวหนังสือ:</span>
+                <span>ขนาด:</span>
               </span>
               <button
                 onClick={() => setFontSize('normal')}
-                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   fontSize === 'normal'
                     ? 'bg-white text-violet-700 shadow-xs border border-violet-100'
                     : 'text-slate-500 hover:text-slate-800'
@@ -204,7 +245,7 @@ export function LayoutContent() {
               </button>
               <button
                 onClick={() => setFontSize('large')}
-                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   fontSize === 'large'
                     ? 'bg-white text-violet-700 shadow-xs border border-violet-100'
                     : 'text-slate-500 hover:text-slate-800'
@@ -215,7 +256,7 @@ export function LayoutContent() {
               </button>
               <button
                 onClick={() => setFontSize('xlarge')}
-                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   fontSize === 'xlarge'
                     ? 'bg-white text-violet-700 shadow-xs border border-violet-100'
                     : 'text-slate-500 hover:text-slate-800'
