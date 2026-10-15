@@ -12,6 +12,7 @@ import { InventoryItem } from '../types';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { UnitSelector } from '../components/UnitSelector';
 import { HideToSecretModal } from '../components/HideToSecretModal';
+import { getCategoryVisual, ItemCuteAvatar, CuteStatusBadge } from '../lib/cuteIcons';
 
 export function CategoryView({ 
   categoryId, 
@@ -1019,71 +1020,103 @@ export function CategoryView({
   return (
     <div className="p-4 sm:p-6 md:p-8 w-full max-w-full min-h-full flex flex-col">
       
-      {/* Header with Title and Custom Modern Tabs */}
-      <header className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight mb-4 md:mb-6">{category.name}</h1>
+      {/* Header with Cute Visual Badge and Modern Tabs */}
+      <header className="mb-6 space-y-4">
+        {(() => {
+          const visual = getCategoryVisual(category.id);
+          const CatIcon = visual.icon;
+          return (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/90 backdrop-blur-md p-5 rounded-3xl border border-slate-100 shadow-2xs">
+              <div className="flex items-center gap-3.5">
+                <div className="relative">
+                  <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-white to-slate-50 shadow-md border border-slate-200/80 flex items-center justify-center group hover:scale-105 transition-transform">
+                    <CatIcon size={26} className={visual.accentColor} />
+                  </div>
+                  <span className="absolute -top-1.5 -right-1.5 text-lg select-none drop-shadow-2xs">
+                    {visual.emoji}
+                  </span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight">
+                      {category.name}
+                    </h1>
+                    <span className={`text-xs font-black px-2.5 py-0.5 rounded-full ${visual.badgeBg} ${visual.badgeText} border ${visual.borderColor} shadow-2xs`}>
+                      {visual.cuteTag}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-bold mt-1 flex items-center gap-1.5">
+                    <span>คลังวอร์ดสุขใจ 💖</span>
+                    <span className="text-slate-300">•</span>
+                    <span>สต็อกพร้อมใช้ {categoryItems.length} รายการ</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Add New Item Button */}
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="bg-gradient-to-r from-violet-600 via-indigo-600 to-pink-500 hover:from-violet-700 hover:via-indigo-700 hover:to-pink-600 text-white flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-sm transition-all shadow-md shadow-indigo-200/70 active:scale-95 cursor-pointer"
+                >
+                  <Plus size={18} strokeWidth={2.5} />
+                  <span>เพิ่มรายการใหม่ ➕</span>
+                </button>
+              </div>
+            </div>
+          );
+        })()}
         
-        <div className="flex overflow-x-auto gap-2 bg-white rounded-3xl p-1.5 shadow-sm border border-slate-100 w-fit max-w-full pb-2 md:pb-1.5 hide-scrollbar">
+        <div className="flex overflow-x-auto gap-2 bg-white/90 backdrop-blur-md rounded-2xl p-1.5 shadow-2xs border border-slate-150/80 w-fit max-w-full pb-2 md:pb-1.5 hide-scrollbar">
           <button 
             onClick={() => setActiveTab('overview')}
-            className={`flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-2xl font-bold text-sm transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 md:px-5 py-2 rounded-xl font-bold text-xs transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'overview' 
-                ? 'bg-rose-50 text-semibold text-rose-500 shadow-sm border border-rose-100' 
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                ? 'bg-violet-600 text-white shadow-xs' 
+                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100/80'
             }`}
           >
-            <LayoutGrid size={16} />
-            <span>ภาพรวม</span>
+            <LayoutGrid size={15} />
+            <span>ภาพรวม 📊</span>
           </button>
           
           <button 
             onClick={() => setActiveTab('items')}
-            className={`flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-2xl font-bold text-sm transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 md:px-5 py-2 rounded-xl font-bold text-xs transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'items' 
-                ? 'bg-rose-50 text-semibold text-rose-500 shadow-sm border border-rose-100' 
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                ? 'bg-violet-600 text-white shadow-xs' 
+                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100/80'
             }`}
           >
-            <Package size={16} />
-            <span>รายการสินค้า</span>
+            <Package size={15} />
+            <span>รายการสินค้า 📦</span>
           </button>
           
           <button 
             onClick={() => setActiveTab('transactions')}
-            className={`flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-2xl font-bold text-sm transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 md:px-5 py-2 rounded-xl font-bold text-xs transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'transactions' 
-                ? 'bg-rose-50 text-semibold text-rose-500 shadow-sm border border-rose-100' 
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                ? 'bg-violet-600 text-white shadow-xs' 
+                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100/80'
             }`}
           >
-            <ArrowLeftRight size={16} />
-            <span>เบิกจ่าย</span>
+            <ArrowLeftRight size={15} />
+            <span>ประวัติเบิกจ่าย 🔄</span>
           </button>
           
           <button 
             onClick={() => setActiveTab('reports')}
-            className={`flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-2xl font-bold text-sm transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 md:px-5 py-2 rounded-xl font-bold text-xs transition-all whitespace-nowrap cursor-pointer ${
               activeTab === 'reports' 
-                ? 'bg-rose-50 text-semibold text-rose-500 shadow-sm border border-rose-100' 
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                ? 'bg-violet-600 text-white shadow-xs' 
+                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100/80'
             }`}
           >
-            <FileText size={16} />
-            <span>รายงาน</span>
+            <FileText size={15} />
+            <span>รายงานสรุป 📑</span>
           </button>
         </div>
       </header>
-
-      {/* Primary Action Button: Add New Item */}
-      <div className="flex justify-end mb-6">
-        <button 
-          onClick={() => setIsAddModalOpen(true)}
-          className="bg-rose-500 hover:bg-rose-600 text-white flex items-center gap-2 px-5 py-3 rounded-2xl font-bold transition-all shadow-md shadow-rose-200 active:scale-[0.98]"
-        >
-          <Plus size={18} />
-          <span>เพิ่มรายการใหม่</span>
-        </button>
-      </div>
 
       {/* -------------------- TAB: OVERVIEW (ภาพรวม) -------------------- */}
       {activeTab === 'overview' && (
@@ -1369,19 +1402,22 @@ export function CategoryView({
                             )}
                           </td>
                           <td className="py-3.5 font-bold text-slate-800 text-sm">
-                            {item.name}
+                            <div className="flex items-center gap-2.5">
+                              <ItemCuteAvatar name={item.name} categoryId={categoryId} />
+                              <span className="leading-snug">{item.name}</span>
+                            </div>
                           </td>
                           <td className="py-3.5 text-center">
-                            <span className="inline-flex items-baseline gap-1 bg-slate-100/80 px-3 py-1 rounded-xl">
+                            <span className="inline-flex items-baseline gap-1 bg-slate-100/80 px-3 py-1 rounded-xl shadow-2xs font-mono">
                               <span className="font-black text-slate-900 text-base">{item.quantity}</span>
-                              <span className="text-xs font-bold text-slate-500">{item.unit}</span>
+                              <span className="text-xs font-bold text-slate-500 font-sans">{item.unit}</span>
                             </span>
                           </td>
                           <td className="py-3.5 text-center">
                             <button
                               type="button"
                               onClick={() => openEditModal(primaryItem)}
-                              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 bg-slate-100/90 hover:bg-indigo-50 px-2.5 py-1 rounded-xl border border-slate-200/80 transition-all cursor-pointer group"
+                              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 bg-slate-100/90 hover:bg-indigo-50 px-2.5 py-1 rounded-xl border border-slate-200/80 transition-all cursor-pointer group shadow-2xs"
                               title="คลิกเพื่อแก้ไขเกณฑ์ Min - Max ทุกบาร์โค้ดที่มีชื่อนี้"
                             >
                               <span className="text-amber-700 font-mono font-bold">Min: {item.minStock}</span>
@@ -1392,7 +1428,7 @@ export function CategoryView({
                           </td>
                           <td className="py-3.5 text-center text-xs font-bold text-slate-600">
                             {item.expiryDate ? (
-                              <span className="bg-rose-50/60 text-rose-700 px-2 py-1 rounded-lg border border-rose-100 inline-block">
+                              <span className="bg-rose-50/60 text-rose-700 px-2 py-1 rounded-lg border border-rose-100 inline-block shadow-2xs">
                                 {formatThaiDate(item.expiryDate)}
                               </span>
                             ) : (
@@ -1403,7 +1439,7 @@ export function CategoryView({
                                 <button
                                   type="button"
                                   onClick={() => setViewLotsItem(primaryItem)}
-                                  className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-0.5 rounded-full border border-indigo-200 cursor-pointer inline-flex items-center gap-1 transition-all"
+                                  className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-0.5 rounded-full border border-indigo-200 cursor-pointer inline-flex items-center gap-1 transition-all shadow-2xs"
                                   title="คลิกเพื่อดูล็อตย่อยและวันหมดอายุแต่ละล็อต"
                                 >
                                   <Tag size={10} className="shrink-0" />
@@ -1413,9 +1449,11 @@ export function CategoryView({
                             )}
                           </td>
                           <td className="py-3.5 text-center whitespace-nowrap">
-                            <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-2xs ${status.class}`}>
-                              {status.label}
-                            </span>
+                            <CuteStatusBadge 
+                              quantity={item.quantity} 
+                              minStock={item.minStock} 
+                              maxStock={item.maxStock} 
+                            />
                           </td>
                           <td className="py-3.5 text-center pr-2">
                             <div className="flex items-center justify-center gap-1.5">
@@ -1563,38 +1601,41 @@ export function CategoryView({
                       <tr key={itemKey} className="hover:bg-slate-50/70 transition-colors group">
                         {/* Item Name & Barcode/ID in a unified, well-proportioned primary column */}
                         <td className="py-4 px-5 pl-6">
-                          <div className="flex flex-col gap-1 w-full">
-                            <span className="font-bold text-slate-800 text-sm leading-snug break-words">
-                              {item.name}
-                            </span>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span 
-                                className="font-mono text-[11px] font-semibold text-slate-500 bg-slate-100/90 hover:bg-slate-200/80 px-2 py-0.5 rounded-md border border-slate-200/80 transition-colors inline-flex items-center gap-1 cursor-default max-w-full"
-                                title={`รหัสสินค้า / บาร์โค้ด: ${item.id}`}
-                              >
-                                <span className="text-[10px] text-slate-400 font-sans">รหัส:</span>
-                                <span className="truncate">{item.id}</span>
+                          <div className="flex items-center gap-3 w-full">
+                            <ItemCuteAvatar name={item.name} categoryId={categoryId} />
+                            <div className="flex flex-col gap-1 w-full min-w-0">
+                              <span className="font-extrabold text-slate-800 text-sm leading-snug break-words group-hover:text-violet-700 transition-colors">
+                                {item.name}
                               </span>
-                              {item.lots && item.lots.length > 1 && (
-                                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-1.5 py-0.5 rounded-md whitespace-nowrap">
-                                  {item.lots.length} ล็อต
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span 
+                                  className="font-mono text-[11px] font-semibold text-slate-500 bg-slate-100/90 hover:bg-slate-200/80 px-2 py-0.5 rounded-lg border border-slate-200/80 transition-colors inline-flex items-center gap-1 cursor-default max-w-full"
+                                  title={`รหัสสินค้า / บาร์โค้ด: ${item.id}`}
+                                >
+                                  <span className="text-[10px] text-slate-400 font-sans">รหัส:</span>
+                                  <span className="truncate">{item.id}</span>
                                 </span>
-                              )}
-                              {item.isHidden && (
-                                <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded-md whitespace-nowrap inline-flex items-center gap-1">
-                                  <Lock size={10} />
-                                  <span>ซ่อนอยู่ (คลังลับ)</span>
-                                </span>
-                              )}
+                                {item.lots && item.lots.length > 1 && (
+                                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-1.5 py-0.5 rounded-md whitespace-nowrap">
+                                    {item.lots.length} ล็อต
+                                  </span>
+                                )}
+                                {item.isHidden && (
+                                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded-md whitespace-nowrap inline-flex items-center gap-1">
+                                    <Lock size={10} />
+                                    <span>ซ่อนอยู่ (คลังลับ)</span>
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>
 
                         {/* Quantity */}
                         <td className="py-4 px-4 text-center whitespace-nowrap">
-                          <div className="inline-flex items-baseline justify-center gap-1">
+                          <div className="inline-flex items-baseline justify-center gap-1 bg-slate-100/80 px-3 py-1 rounded-xl shadow-2xs font-mono">
                             <span className="font-black text-slate-900 text-base">{item.quantity}</span>
-                            <span className="text-xs text-slate-400 font-medium">{item.unit}</span>
+                            <span className="text-xs text-slate-500 font-sans">{item.unit}</span>
                           </div>
                         </td>
 
@@ -1603,7 +1644,7 @@ export function CategoryView({
                           <button
                             type="button"
                             onClick={() => openEditModal(item)}
-                            className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 px-3 py-1.5 rounded-xl border border-slate-200 transition-all cursor-pointer whitespace-nowrap group"
+                            className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 px-3 py-1.5 rounded-xl border border-slate-200 transition-all cursor-pointer whitespace-nowrap group shadow-2xs"
                             title="คลิกเพื่อแก้ไขเกณฑ์ Min - Max"
                           >
                             <span className="text-amber-700 font-mono font-bold">Min: {item.minStock ?? 10}</span>
@@ -1623,7 +1664,7 @@ export function CategoryView({
                               <button
                                 type="button"
                                 onClick={() => setViewLotsItem(item)}
-                                className="inline-flex items-center justify-center gap-1 text-[11px] font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-0.5 rounded-full border border-indigo-200 transition-colors cursor-pointer whitespace-nowrap"
+                                className="inline-flex items-center justify-center gap-1 text-[11px] font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-0.5 rounded-full border border-indigo-200 transition-colors cursor-pointer whitespace-nowrap shadow-2xs"
                                 title="คลิกเพื่อดูล็อตย่อยและวันหมดอายุของแต่ละล็อต"
                               >
                                 <Tag size={10} className="shrink-0" />
@@ -1633,11 +1674,13 @@ export function CategoryView({
                           </div>
                         </td>
 
-                        {/* Status Badge - Single neat line */}
+                        {/* Status Badge with Cute Emoji */}
                         <td className="py-4 px-4 text-center whitespace-nowrap">
-                          <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-2xs ${status.class}`}>
-                            {status.label}
-                          </span>
+                          <CuteStatusBadge 
+                            quantity={item.quantity} 
+                            minStock={item.minStock} 
+                            maxStock={item.maxStock} 
+                          />
                         </td>
 
                         {/* Actions */}

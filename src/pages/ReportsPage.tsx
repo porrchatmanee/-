@@ -413,33 +413,39 @@ export function ReportsPage() {
       <div className="print:hidden space-y-6">
         
         {/* Page Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-          <div>
-            <div className="flex items-center gap-2 text-indigo-600 mb-1">
-              <FileText size={20} />
-              <span className="text-xs font-bold uppercase tracking-wider">Hospital Inventory Reports</span>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-gradient-to-r from-violet-500/10 via-purple-500/5 to-pink-500/10 p-6 rounded-3xl border border-violet-100/80 shadow-xs relative overflow-hidden">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-violet-200">
+              <FileText size={22} />
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">รายงานและพิมพ์เอกสารคลังวอร์ด</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              พิมพ์รายงานสรุปรับ-จ่ายแยกรายเดือน, แยกรายคลัง (ยา, เวชภัณฑ์, น้ำเกลือ), และรายงานประจำปีงบประมาณ
-            </p>
+            <div>
+              <div className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-xs font-black text-indigo-700 border border-indigo-200/60 shadow-2xs mb-2">
+                <span>Hospital Inventory Reports 📑</span>
+              </div>
+              <h1 className="text-2xl font-black text-slate-800 tracking-tight">
+                รายงานและพิมพ์เอกสารคลังวอร์ด 📄
+              </h1>
+              <p className="text-sm text-slate-500 mt-1">
+                พิมพ์รายงานสรุปรับ-จ่ายแยกรายเดือน, แยกรายคลัง (ยา, เวชภัณฑ์, น้ำเกลือ), และรายงานประจำปีงบประมาณ 💖
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={handleExportCSV}
-              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl font-semibold text-sm transition-all shadow-2xs active:scale-95 cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-2xl font-bold text-xs transition-all shadow-2xs hover:shadow-sm active:scale-95 cursor-pointer"
             >
-              <Download size={16} />
-              <span>ส่งออก Excel (CSV)</span>
+              <Download size={15} />
+              <span>ส่งออก Excel (CSV) 📊</span>
             </button>
 
             <button
               onClick={handlePrint}
-              className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-sm transition-all shadow-md shadow-indigo-200 active:scale-95 cursor-pointer"
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-2xl font-black text-xs transition-all shadow-md shadow-indigo-200 active:scale-95 cursor-pointer"
             >
-              <Printer size={18} />
-              <span>พิมพ์รายงาน (Print A4)</span>
+              <Printer size={16} />
+              <span>พิมพ์รายงาน (Print A4) 🖨️</span>
             </button>
           </div>
         </div>

@@ -318,23 +318,26 @@ export function SecretStockPage({ onNavigate }: SecretStockPageProps) {
       <div className="p-4 sm:p-6 md:p-8 w-full max-w-full min-h-[85vh] flex items-center justify-center">
         <div className="w-full max-w-md bg-white rounded-3xl p-8 border border-slate-100 shadow-xl text-center space-y-6 animate-fadeIn">
           
-          {/* Lock Icon Emblem */}
-          <div className="relative mx-auto w-20 h-20 bg-rose-50 rounded-3xl flex items-center justify-center text-rose-500 border border-rose-100 shadow-sm">
-            <Lock size={36} strokeWidth={2.5} />
-            <div className="absolute -top-1 -right-1 w-5 h-5 bg-amber-400 rounded-full border-2 border-white flex items-center justify-center">
-              <KeyRound size={10} className="text-white" />
+          {/* Cute Lock Icon Emblem */}
+          <div className="relative mx-auto w-22 h-22 bg-gradient-to-tr from-pink-100 via-rose-50 to-indigo-50 rounded-3xl flex items-center justify-center text-rose-500 border border-rose-200/80 shadow-md">
+            <Lock size={38} strokeWidth={2.5} className="animate-pulse" />
+            <div className="absolute -top-1.5 -right-1.5 w-7 h-7 bg-gradient-to-tr from-amber-400 to-yellow-400 rounded-full border-2 border-white flex items-center justify-center text-xs shadow-2xs">
+              🗝️
+            </div>
+            <div className="absolute -bottom-1 -left-1 text-sm select-none">
+              ✨
             </div>
           </div>
 
           <div>
-            <span className="text-xs font-bold text-rose-600 bg-rose-50 px-3 py-1 rounded-full uppercase tracking-wider border border-rose-200">
-              Confidential & Emergency Reserve
+            <span className="text-xs font-black text-rose-600 bg-rose-50 px-3 py-1 rounded-full uppercase tracking-wider border border-rose-200 shadow-2xs">
+              Confidential &amp; Emergency Reserve 🔐
             </span>
             <h1 className="text-2xl font-black text-slate-800 tracking-tight mt-2.5">
-              คลังสำรองลับเฉพาะ (Secret Stock)
+              คลังสำรองลับเฉพาะ (Secret Stock) 💖
             </h1>
             <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto leading-relaxed">
-              พื้นที่จัดเก็บเวชภัณฑ์ลับเฉพาะวอร์ด สำหรับเคสวิกฤตฉุกเฉินและเวรดึก กรุณาใส่รหัส PIN เพื่อเปิดใช้งาน
+              พื้นที่จัดเก็บเวชภัณฑ์ลับเฉพาะวอร์ด สำหรับเคสวิกฤตฉุกเฉินและเวรดึก กรุณาใส่รหัส PIN เพื่อเปิดใช้งาน ✨
             </p>
           </div>
 
@@ -475,35 +478,44 @@ export function SecretStockPage({ onNavigate }: SecretStockPageProps) {
         </div>
       </div>
 
-      {/* Quick Summary Cards */}
+      {/* Quick Summary Cards with Cute Dual-Layer Badges */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
-            <Package size={24} />
+        <div className="bg-gradient-to-br from-rose-50 to-pink-50/50 p-5 rounded-3xl border border-rose-100 shadow-2xs flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-rose-500 text-white flex items-center justify-center font-bold shadow-md shadow-rose-200">
+            <Package size={22} />
           </div>
           <div>
-            <span className="text-xs font-bold text-slate-400 uppercase">รายการสินค้าลับ</span>
+            <span className="text-xs font-bold text-rose-500 uppercase flex items-center gap-1">
+              <span>รายการสินค้าลับ</span>
+              <span>🔐</span>
+            </span>
             <p className="text-2xl font-black text-slate-800">{secretItems.length} <span className="text-xs font-bold text-slate-400">รายการ</span></p>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-            <ShieldCheck size={24} />
+        <div className="bg-gradient-to-br from-amber-50 to-orange-50/50 p-5 rounded-3xl border border-amber-100 shadow-2xs flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-md shadow-amber-200">
+            <ShieldCheck size={22} />
           </div>
           <div>
-            <span className="text-xs font-bold text-slate-400 uppercase">ยอดคงเหลือรวมในคลังลับ</span>
-            <p className="text-2xl font-black text-amber-700">{totalUnits.toLocaleString()} <span className="text-xs font-bold text-slate-400">ชิ้น/หน่วย</span></p>
+            <span className="text-xs font-bold text-amber-600 uppercase flex items-center gap-1">
+              <span>ยอดคงเหลือรวม</span>
+              <span>✨</span>
+            </span>
+            <p className="text-2xl font-black text-amber-800">{totalUnits.toLocaleString()} <span className="text-xs font-bold text-slate-400">ชิ้น/หน่วย</span></p>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-            <MapPin size={24} />
+        <div className="bg-gradient-to-br from-indigo-50 to-purple-50/50 p-5 rounded-3xl border border-indigo-100 shadow-2xs flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-500 text-white flex items-center justify-center font-bold shadow-md shadow-indigo-200">
+            <MapPin size={22} />
           </div>
           <div>
-            <span className="text-xs font-bold text-slate-400 uppercase">จุดซ่อน / ตู้เก็บสำรอง</span>
-            <p className="text-2xl font-black text-indigo-700">{uniqueLocations} <span className="text-xs font-bold text-slate-400">จุดที่เก็บ</span></p>
+            <span className="text-xs font-bold text-indigo-600 uppercase flex items-center gap-1">
+              <span>จุดซ่อน / ตู้เก็บ</span>
+              <span>📍</span>
+            </span>
+            <p className="text-2xl font-black text-indigo-800">{uniqueLocations} <span className="text-xs font-bold text-slate-400">จุดที่เก็บ</span></p>
           </div>
         </div>
       </div>

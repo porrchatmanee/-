@@ -7,9 +7,12 @@ import {
   ArrowRight, PackageOpen, AlertCircle, Search, Package, 
   Tag, Clock, Layers, CheckCircle2, AlertTriangle, X, 
   HelpCircle, Sparkles, Filter, ChevronRight, Edit, SlidersHorizontal, Target, Save,
-  FileText, Printer, ArrowLeftRight, Lock, Unlock, Eye, EyeOff
+  FileText, Printer, ArrowLeftRight, Lock, Unlock, Eye, EyeOff, Heart, Star
 } from 'lucide-react';
 import { HideToSecretModal } from '../components/HideToSecretModal';
+import { 
+  MascotAvatar, ItemCuteAvatar, CuteCategoryBadge, CuteStatusBadge, getCategoryVisual 
+} from '../lib/cuteIcons';
 
 interface DashboardProps {
   onNavigate: (view: string, itemData?: any) => void;
@@ -138,51 +141,60 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   };
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 w-full max-w-full pt-6 md:pt-8 space-y-8 md:space-y-10">
+    <div className="p-4 sm:p-6 md:p-8 w-full max-w-full space-y-6 md:space-y-8">
       
-      {/* Header */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2.5">
-            <span>ภาพรวมคลังสินค้าและจำนวนคงเหลือ</span>
-          </h1>
-          <p className="text-slate-500 mt-1 text-sm md:text-base">
-            ตรวจสอบยอดคงเหลือ กำหนดเกณฑ์ Min-Max และดูวันหมดอายุของทุกล็อต
-          </p>
+      {/* Modern Youthful Header */}
+      <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 bg-gradient-to-r from-violet-500/10 via-pink-500/5 to-indigo-500/10 p-6 rounded-3xl border border-violet-100/80 shadow-xs relative overflow-hidden">
+        <div className="relative z-10 flex items-start gap-4">
+          <MascotAvatar size="lg" />
+          <div>
+            <div className="inline-flex items-center gap-2 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-xs font-black text-violet-700 border border-violet-200/60 shadow-2xs mb-2">
+              <Sparkles size={13} className="text-pink-500 animate-spin-slow" />
+              <span>คลังสต็อกอัจฉริยะ วอร์ดสุขใจ 💖</span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2.5">
+              <span>ภาพรวมคลังสินค้า &amp; จำนวนคงเหลือ</span>
+            </h1>
+            <p className="text-slate-500 mt-1 text-sm md:text-base font-medium">
+              เช็กสต็อกเรียลไทม์ กำหนดเกณฑ์ Min-Max และติดตามวันหมดอายุได้ง่ายๆ สบายตา ✨
+            </p>
+          </div>
         </div>
 
         {/* Global Stock Stats Badges & Reports Button */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 relative z-10">
           <button
             onClick={() => onNavigate('reports')}
-            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-2xl font-bold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-violet-50 text-violet-700 border border-violet-200 rounded-2xl font-bold text-xs shadow-xs hover:shadow-md transition-all active:scale-95 cursor-pointer"
           >
             <Printer size={16} />
-            <span>ออกรายงาน &amp; พิมพ์ A4</span>
+            <span>พิมพ์รายงาน A4 📄</span>
           </button>
 
-          <div className="bg-white border border-slate-200/80 rounded-2xl px-4 py-2 shadow-xs">
+          <div className="bg-white/90 backdrop-blur-md border border-slate-200/80 rounded-2xl px-4 py-2 shadow-xs hover:scale-105 transition-transform">
             <span className="text-[10px] font-bold text-slate-400 block uppercase">สินค้าทั้งหมด</span>
             <span className="text-lg font-black text-slate-800">{totalAllItems} <span className="text-xs text-slate-500 font-bold">รายการ</span></span>
           </div>
-          <div className="bg-white border border-slate-200/80 rounded-2xl px-4 py-2 shadow-xs">
-            <span className="text-[10px] font-bold text-slate-400 block uppercase">ยอดคงเหลือรวม</span>
-            <span className="text-lg font-black text-indigo-600">{totalAllUnits.toLocaleString()} <span className="text-xs text-slate-500 font-bold">ชิ้น/หน่วย</span></span>
+          
+          <div className="bg-white/90 backdrop-blur-md border border-indigo-200/80 rounded-2xl px-4 py-2 shadow-xs hover:scale-105 transition-transform">
+            <span className="text-[10px] font-bold text-indigo-400 block uppercase">ยอดคงเหลือรวม</span>
+            <span className="text-lg font-black text-indigo-600">{totalAllUnits.toLocaleString()} <span className="text-xs text-indigo-400 font-bold">ชิ้น</span></span>
           </div>
+          
           {totalLowStock > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2 shadow-xs">
+            <div className="bg-amber-50/90 border border-amber-200 rounded-2xl px-4 py-2 shadow-xs hover:scale-105 transition-transform">
               <span className="text-[10px] font-bold text-amber-700 block uppercase">สต็อกต่ำ (≤Min)</span>
               <span className="text-lg font-black text-amber-800">{totalLowStock} <span className="text-xs text-amber-700 font-bold">รายการ</span></span>
             </div>
           )}
           {totalOverStock > 0 && (
-            <div className="bg-sky-50 border border-sky-200 rounded-2xl px-4 py-2 shadow-xs">
+            <div className="bg-sky-50/90 border border-sky-200 rounded-2xl px-4 py-2 shadow-xs hover:scale-105 transition-transform">
               <span className="text-[10px] font-bold text-sky-700 block uppercase">สต็อกเกิน (&gt;Max)</span>
               <span className="text-lg font-black text-sky-800">{totalOverStock} <span className="text-xs text-sky-700 font-bold">รายการ</span></span>
             </div>
           )}
           {totalOutOfStock > 0 && (
-            <div className="bg-rose-50 border border-rose-200 rounded-2xl px-4 py-2 shadow-xs">
+            <div className="bg-rose-50/90 border border-rose-200 rounded-2xl px-4 py-2 shadow-xs hover:scale-105 transition-transform">
               <span className="text-[10px] font-bold text-rose-700 block uppercase">หมดสต็อก</span>
               <span className="text-lg font-black text-rose-800">{totalOutOfStock} <span className="text-xs text-rose-700 font-bold">รายการ</span></span>
             </div>
@@ -194,31 +206,31 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       <section>
         <div 
           onClick={() => onNavigate('borrow')}
-          className="bg-gradient-to-br from-indigo-50/70 to-white p-5 rounded-3xl border border-indigo-150/70 shadow-xs hover:shadow-md transition-all cursor-pointer group flex items-center justify-between gap-4"
+          className="bg-gradient-to-r from-violet-50/90 via-purple-50/50 to-pink-50/80 p-5 rounded-3xl border border-purple-100 shadow-xs hover:shadow-md transition-all cursor-pointer group flex items-center justify-between gap-4 active:scale-[0.99]"
         >
           <div className="flex items-center gap-4 min-w-0">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-200 group-hover:scale-105 transition-transform">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-violet-200 group-hover:scale-105 group-hover:rotate-3 transition-transform">
               <ArrowLeftRight size={22} />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h3 className="font-extrabold text-base text-slate-800 tracking-tight group-hover:text-indigo-600 transition-colors">
-                  ระบบยืม-คืนของ &amp; เครื่องมือ
+                <h3 className="font-extrabold text-base text-slate-800 tracking-tight group-hover:text-violet-700 transition-colors">
+                  ระบบยืม-คืนของ &amp; เครื่องมือทางการแพทย์ 🌸
                 </h3>
                 {((borrowRecords || []).filter(r => r.status !== 'RETURNED').length > 0) && (
-                  <span className="text-[10px] font-black bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-black bg-pink-100 text-pink-700 border border-pink-200 px-2.5 py-0.5 rounded-full">
                     กำลังยืม {(borrowRecords || []).filter(r => r.status !== 'RETURNED').length} รายการ
                   </span>
                 )}
               </div>
               <p className="text-xs text-slate-500 mt-0.5 truncate">
-                บันทึกผู้ยืม แผนก กำหนดส่งคืน และออกใบยืม-คืนอุปกรณ์ (เลือกจากคลังสินค้าทั้งหมดที่มี)
+                บันทึกผู้ยืม แผนก กำหนดส่งคืน และออกใบยืม-คืนอุปกรณ์ เลือกจากคลังสินค้าทั้งหมดได้ทันที 💖
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs font-bold text-indigo-600 hidden sm:inline">เปิดระบบยืม-คืน</span>
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 group-hover:translate-x-1 transition-transform">
+            <span className="text-xs font-bold text-violet-700 hidden sm:inline">เปิดระบบยืม-คืน</span>
+            <div className="w-9 h-9 rounded-2xl bg-white text-violet-700 flex items-center justify-center shrink-0 group-hover:translate-x-1 transition-transform shadow-2xs border border-violet-100">
               <ArrowRight size={16} />
             </div>
           </div>
@@ -282,68 +294,98 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       {/* ----------------- 1. CATEGORY CARDS SUMMARY ----------------- */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
-            <Layers size={18} className="text-indigo-600" />
-            <span>หมวดหมู่คลังสินค้า</span>
-          </h2>
-          <span className="text-xs text-slate-400 font-medium">คลิกหมวดหมู่เพื่อดูสต็อกแยกแผนก</span>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center font-bold">
+              <Layers size={17} />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-slate-800">
+                หมวดหมู่คลังสินค้าทั้งหมด 💖
+              </h2>
+              <span className="text-xs text-slate-400 font-medium">คลิกหมวดหมู่เพื่อดูสต็อกแยกแผนก &amp; จัดการสินค้า</span>
+            </div>
+          </div>
+          <span className="text-xs font-bold bg-violet-50 text-violet-700 border border-violet-100 px-3 py-1 rounded-full">
+            {summary.length} หมวดหลัก
+          </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {summary.map(cat => (
-            <div 
-              key={cat.id} 
-              className={`rounded-3xl p-6 border transition-all hover:shadow-lg cursor-pointer ${cat.bgColor} ${cat.borderColor} group relative overflow-hidden`}
-              onClick={() => onNavigate(`category_${cat.id}`)}
-            >
-              <div className="flex justify-between items-start mb-5">
-                <div>
-                  <h3 className={`font-black text-xl ${cat.color}`}>{cat.name}</h3>
-                  <p className="text-slate-600 text-xs font-bold mt-0.5">{cat.count} รายการในคลัง</p>
-                </div>
-                <div className={`p-3 rounded-2xl bg-white/70 shadow-xs ${cat.color}`}>
-                  <PackageOpen size={22} />
-                </div>
-              </div>
-              
-              <div className="flex items-end justify-between pt-2">
-                <div>
-                  <span className="text-xs font-bold text-slate-400 block">จำนวนคงเหลือรวม</span>
-                  <div className="text-3xl font-black text-slate-800 tracking-tight">
-                    {cat.totalQty.toLocaleString()}
-                    <span className="text-xs font-bold text-slate-500 ml-1.5 font-normal">ชิ้น/หน่วย</span>
+          {summary.map(cat => {
+            const visual = getCategoryVisual(cat.id);
+            const CatIcon = visual.icon;
+
+            return (
+              <div 
+                key={cat.id} 
+                className={`rounded-3xl p-6 border transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:shadow-indigo-100/50 cursor-pointer ${cat.bgColor} ${cat.borderColor} group relative overflow-hidden bg-gradient-to-br from-white/90 via-white/70 to-transparent backdrop-blur-xs active:scale-[0.98]`}
+                onClick={() => onNavigate(`category_${cat.id}`)}
+              >
+                {/* Cute background watermark */}
+                <span className="absolute -right-2 -bottom-4 text-7xl opacity-10 select-none group-hover:scale-125 group-hover:rotate-12 transition-transform duration-300 pointer-events-none">
+                  {visual.emoji}
+                </span>
+
+                <div className="flex justify-between items-start mb-5 relative z-10">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <div className="w-12 h-12 rounded-2xl bg-white shadow-md shadow-slate-200/50 border border-white/80 flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-transform">
+                        <CatIcon size={24} className={visual.accentColor} />
+                      </div>
+                      <span className="absolute -top-1.5 -right-1.5 text-base select-none drop-shadow-2xs">
+                        {visual.emoji}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className={`font-black text-lg ${cat.color}`}>{cat.name}</h3>
+                      <p className="text-slate-500 text-xs font-bold mt-0.5 flex items-center gap-1">
+                        <span>{cat.count} รายการในคลัง</span>
+                        <span className="text-[10px] text-slate-300">•</span>
+                        <span className="text-[10px] font-extrabold text-indigo-500">{visual.cuteTag}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className={`p-2.5 rounded-2xl bg-white/90 shadow-2xs ${cat.color} group-hover:scale-110 transition-transform`}>
+                    <PackageOpen size={18} />
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 group-hover:translate-x-1 transition-transform">
-                  <span className={`text-xs font-black ${cat.color}`}>เข้าสู่คลัง</span>
-                  <ArrowRight size={15} className={cat.color} />
+                
+                <div className="flex items-end justify-between pt-2 relative z-10">
+                  <div>
+                    <span className="text-xs font-bold text-slate-400 block">จำนวนคงเหลือรวม</span>
+                    <div className="text-3xl font-black text-slate-800 tracking-tight flex items-baseline gap-1">
+                      {cat.totalQty.toLocaleString()}
+                      <span className="text-xs font-bold text-slate-400 font-sans">ชิ้น/หน่วย</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 group-hover:translate-x-1.5 transition-transform bg-white/95 px-3.5 py-1.5 rounded-2xl shadow-xs border border-white">
+                    <span className={`text-xs font-black ${cat.color}`}>เข้าคลัง ✨</span>
+                    <ArrowRight size={13} className={cat.color} />
+                  </div>
                 </div>
-              </div>
 
-              {(cat.lowStockCount > 0 || cat.overStockCount > 0 || cat.outOfStockCount > 0) && (
-                <div className="mt-4 pt-3 border-t border-white/50 flex flex-wrap items-center gap-2 text-xs font-bold">
-                  {cat.lowStockCount > 0 && (
-                    <span className="inline-flex items-center gap-1 text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-lg border border-amber-200">
-                      <AlertCircle size={12} />
-                      <span>สต็อกต่ำ (≤Min): {cat.lowStockCount}</span>
-                    </span>
-                  )}
-                  {cat.overStockCount > 0 && (
-                    <span className="inline-flex items-center gap-1 text-sky-800 bg-sky-100/80 px-2 py-0.5 rounded-lg border border-sky-200">
-                      <Target size={12} />
-                      <span>สต็อกเกิน (&gt;Max): {cat.overStockCount}</span>
-                    </span>
-                  )}
-                  {cat.outOfStockCount > 0 && (
-                    <span className="inline-flex items-center gap-1 text-rose-800 bg-rose-100/80 px-2 py-0.5 rounded-lg border border-rose-200">
-                      <X size={12} />
-                      <span>หมดสต็อก: {cat.outOfStockCount}</span>
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
+                {(cat.lowStockCount > 0 || cat.overStockCount > 0 || cat.outOfStockCount > 0) && (
+                  <div className="mt-4 pt-3 border-t border-white/60 flex flex-wrap items-center gap-2 text-xs font-bold relative z-10">
+                    {cat.lowStockCount > 0 && (
+                      <span className="inline-flex items-center gap-1 text-amber-800 bg-amber-100/90 px-2.5 py-0.5 rounded-xl border border-amber-200 shadow-2xs">
+                        <span>⚠️ สต็อกต่ำ: {cat.lowStockCount}</span>
+                      </span>
+                    )}
+                    {cat.overStockCount > 0 && (
+                      <span className="inline-flex items-center gap-1 text-sky-800 bg-sky-100/90 px-2.5 py-0.5 rounded-xl border border-sky-200 shadow-2xs">
+                        <span>📈 สต็อกเกิน: {cat.overStockCount}</span>
+                      </span>
+                    )}
+                    {cat.outOfStockCount > 0 && (
+                      <span className="inline-flex items-center gap-1 text-rose-800 bg-rose-100/90 px-2.5 py-0.5 rounded-xl border border-rose-200 shadow-2xs">
+                        <span>🚨 หมด: {cat.outOfStockCount}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -362,33 +404,33 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </p>
           </div>
 
-          {/* Quick Filter Badges */}
+          {/* Quick Filter Badges (Cute Modern Youthful Pills) */}
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setStockFilter('all')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold transition-all cursor-pointer active:scale-95 ${
                 stockFilter === 'all' 
-                  ? 'bg-indigo-600 text-white shadow-xs' 
+                  ? 'bg-violet-600 text-white shadow-xs shadow-violet-200' 
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              ทั้งหมด ({items.length})
+              🌈 ทั้งหมด ({items.length})
             </button>
             <button
               onClick={() => setStockFilter('low')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold transition-all cursor-pointer active:scale-95 ${
                 stockFilter === 'low' 
-                  ? 'bg-amber-600 text-white shadow-xs' 
+                  ? 'bg-amber-500 text-white shadow-xs shadow-amber-200' 
                   : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200/60'
               }`}
             >
-              📉 สต็อกต่ำ ≤Min ({totalLowStock})
+              ⚠️ สต็อกต่ำ ≤Min ({totalLowStock})
             </button>
             <button
               onClick={() => setStockFilter('over')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold transition-all cursor-pointer active:scale-95 ${
                 stockFilter === 'over' 
-                  ? 'bg-sky-600 text-white shadow-xs' 
+                  ? 'bg-sky-500 text-white shadow-xs shadow-sky-200' 
                   : 'bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200/60'
               }`}
             >
@@ -396,29 +438,29 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </button>
             <button
               onClick={() => setStockFilter('out')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold transition-all cursor-pointer active:scale-95 ${
                 stockFilter === 'out' 
-                  ? 'bg-rose-600 text-white shadow-xs' 
+                  ? 'bg-rose-500 text-white shadow-xs shadow-rose-200' 
                   : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200/60'
               }`}
             >
-              ❌ หมดสต็อก ({totalOutOfStock})
+              🚨 หมดสต็อก ({totalOutOfStock})
             </button>
             <button
               onClick={() => setStockFilter('hasExpiry')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold transition-all cursor-pointer active:scale-95 ${
                 stockFilter === 'hasExpiry' 
-                  ? 'bg-slate-800 text-white shadow-xs' 
+                  ? 'bg-violet-900 text-white shadow-xs' 
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              📅 มีวันหมดอายุ ({items.filter(i => i.expiryDate).length})
+              ⏳ มีวันหมดอายุ ({items.filter(i => i.expiryDate).length})
             </button>
 
             {hiddenItemsCount > 0 && (
               <button
                 onClick={() => setShowHiddenItems(!showHiddenItems)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border active:scale-95 ${
                   showHiddenItems 
                     ? 'bg-rose-50 text-rose-700 border-rose-200 shadow-xs ring-2 ring-rose-200/50' 
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -426,7 +468,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 title={showHiddenItems ? "กำลังแสดงไอเทมที่ซ่อนไว้ คลิกเพื่อซ่อนกลับ" : "คลิกเพื่อดูไอเทมที่ถูกซ่อนไว้"}
               >
                 {showHiddenItems ? <Eye size={13} className="text-rose-600" /> : <EyeOff size={13} className="text-slate-400" />}
-                <span>{showHiddenItems ? 'ซ่อนของลับ' : 'ดูของที่ซ่อนไว้'} ({hiddenItemsCount})</span>
+                <span>{showHiddenItems ? 'ซ่อนของลับ' : 'ดูของลับที่ซ่อนไว้ 🔐'} ({hiddenItemsCount})</span>
               </button>
             )}
           </div>
@@ -436,18 +478,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {/* Search Box */}
           <div className="md:col-span-2 relative">
-            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-violet-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="ค้นหาตามชื่อสินค้า, รหัสบาร์โค้ด, หรือหมายเลขล็อต..."
+              placeholder="🔍 ค้นหาตามชื่อสินค้า, บาร์โค้ด หรือหมายเลขล็อตได้ทันที..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 font-medium transition-all"
+              className="w-full pl-10 pr-10 py-3 bg-violet-50/30 border border-violet-100/90 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 focus:bg-white font-medium transition-all shadow-2xs"
             />
             {searchTerm && (
               <button 
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-slate-200/70 hover:bg-slate-300 text-slate-600 text-xs font-bold flex items-center justify-center cursor-pointer transition-colors"
               >
                 ✕
               </button>
@@ -459,9 +501,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 cursor-pointer"
+              className="w-full py-3 px-4 bg-violet-50/30 border border-violet-100/90 rounded-2xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:bg-white cursor-pointer shadow-2xs transition-all"
             >
-              <option value="all">ทุกหมวดหมู่คลัง ({items.length})</option>
+              <option value="all">📁 ทุกหมวดหมู่คลัง ({items.length})</option>
               {CATEGORIES.map(cat => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name} ({items.filter(i => i.categoryId === cat.id).length})
@@ -497,45 +539,46 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
                   return (
                     <tr key={(item as any).key || item.id} className="hover:bg-slate-50/80 transition-colors group">
-                      {/* Name & Barcode in a unified primary column */}
+                      {/* Name & Barcode in a unified primary column with Cute Avatar */}
                       <td className="py-4 px-4 pl-5">
-                        <div className="flex flex-col gap-1 w-full">
-                          <div className="font-extrabold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors leading-snug break-words">
-                            {item.name}
-                          </div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span 
-                              className="font-mono text-[11px] font-semibold text-slate-500 bg-slate-100/90 hover:bg-slate-200/80 px-2 py-0.5 rounded-md border border-slate-200/80 transition-colors inline-flex items-center gap-1 cursor-default max-w-full"
-                              title={`รหัสสินค้า / บาร์โค้ด: ${displayId}`}
-                            >
-                              <span className="text-[10px] text-slate-400 font-sans">รหัส:</span>
-                              <span className="truncate">{displayId}</span>
-                            </span>
-                            {hasMultipleBarcodes && (
-                              <span className="text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-200/80 font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap">
-                                +{(item as any).groupBarcodes.length - 1} รหัสอื่นในกลุ่ม
+                        <div className="flex items-center gap-3 w-full">
+                          <ItemCuteAvatar name={item.name} categoryId={item.categoryId} />
+                          <div className="flex flex-col gap-1 w-full min-w-0">
+                            <div className="font-extrabold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors leading-snug break-words">
+                              {item.name}
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span 
+                                className="font-mono text-[11px] font-semibold text-slate-500 bg-slate-100/90 hover:bg-slate-200/80 px-2 py-0.5 rounded-lg border border-slate-200/80 transition-colors inline-flex items-center gap-1 cursor-default max-w-full"
+                                title={`รหัสสินค้า / บาร์โค้ด: ${displayId}`}
+                              >
+                                <span className="text-[10px] text-slate-400 font-sans">รหัส:</span>
+                                <span className="truncate">{displayId}</span>
                               </span>
-                            )}
-                            {item.isHidden && (
-                              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded-md whitespace-nowrap inline-flex items-center gap-1">
-                                <Lock size={10} />
-                                <span>ซ่อนอยู่ (คลังลับ)</span>
-                              </span>
-                            )}
+                              {hasMultipleBarcodes && (
+                                <span className="text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-200/80 font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap">
+                                  +{(item as any).groupBarcodes.length - 1} รหัสอื่นในกลุ่ม
+                                </span>
+                              )}
+                              {item.isHidden && (
+                                <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded-md whitespace-nowrap inline-flex items-center gap-1">
+                                  <Lock size={10} />
+                                  <span>ซ่อนอยู่ (คลังลับ)</span>
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
 
-                      {/* Category Badge */}
+                      {/* Category Badge with Cute Icon */}
                       <td className="py-4 px-3 text-center whitespace-nowrap">
-                        <span className={`inline-block px-2.5 py-1 rounded-xl text-xs font-bold whitespace-nowrap ${cat?.bgColor || 'bg-slate-100'} ${cat?.color || 'text-slate-600'} border ${cat?.borderColor || 'border-slate-200'}`}>
-                          {cat?.name || item.categoryId}
-                        </span>
+                        <CuteCategoryBadge categoryId={item.categoryId} size="sm" categoryName={cat?.name} />
                       </td>
 
                       {/* Stock Quantity - High Visibility */}
                       <td className="py-4 px-3 text-center whitespace-nowrap">
-                        <span className={`inline-flex items-baseline justify-center gap-1 px-3 py-1 rounded-xl font-mono whitespace-nowrap ${
+                        <span className={`inline-flex items-baseline justify-center gap-1 px-3 py-1 rounded-xl font-mono whitespace-nowrap shadow-2xs ${
                           item.quantity === 0 ? 'bg-rose-50 border border-rose-200 text-rose-700 font-black' :
                           item.quantity <= (item.minStock ?? 10) ? 'bg-amber-50 border border-amber-200 text-amber-800 font-black' :
                           item.quantity > (item.maxStock ?? 100) ? 'bg-sky-50 border border-sky-200 text-sky-800 font-black' :
@@ -551,7 +594,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         <button
                           type="button"
                           onClick={() => openDashboardMinMaxModal(item)}
-                          className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 bg-slate-100/80 hover:bg-indigo-50 px-2.5 py-1 rounded-xl border border-slate-200/80 transition-all cursor-pointer whitespace-nowrap group"
+                          className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700 hover:text-indigo-600 bg-slate-100/80 hover:bg-indigo-50 px-2.5 py-1 rounded-xl border border-slate-200/80 transition-all cursor-pointer whitespace-nowrap group shadow-2xs"
                           title="คลิกเพื่อแก้ไขเกณฑ์ Min - Max ของสินค้านี้"
                         >
                           <span className="text-amber-700 font-mono font-bold">Min: {item.minStock ?? 10}</span>
@@ -565,7 +608,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       <td className="py-4 px-3 text-center whitespace-nowrap">
                         <div className="flex flex-col items-center justify-center gap-1 whitespace-nowrap">
                           {item.expiryDate ? (
-                            <span className="font-bold text-xs text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100 inline-block whitespace-nowrap">
+                            <span className="font-bold text-xs text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100 inline-block whitespace-nowrap shadow-2xs">
                               {formatThaiDate(item.expiryDate)}
                             </span>
                           ) : (
@@ -577,7 +620,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                             <button
                               type="button"
                               onClick={() => setInspectLotItem(item)}
-                              className="text-[10px] font-black text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-0.5 rounded-full border border-indigo-200 cursor-pointer inline-flex items-center justify-center gap-1 transition-all whitespace-nowrap"
+                              className="text-[10px] font-black text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-0.5 rounded-full border border-indigo-200 cursor-pointer inline-flex items-center justify-center gap-1 transition-all whitespace-nowrap shadow-2xs"
                               title="คลิกเพื่อดูล็อตย่อยและวันหมดอายุแต่ละล็อต"
                             >
                               <Tag size={10} className="shrink-0" />
@@ -587,11 +630,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         </div>
                       </td>
 
-                      {/* Status */}
+                      {/* Status with Cute Emoji Badge */}
                       <td className="py-4 px-3 text-center whitespace-nowrap">
-                        <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-2xs border ${status.class}`}>
-                          {status.label}
-                        </span>
+                        <CuteStatusBadge 
+                          quantity={item.quantity} 
+                          minStock={item.minStock} 
+                          maxStock={item.maxStock} 
+                        />
                       </td>
 
                       {/* Action */}

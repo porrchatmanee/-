@@ -253,87 +253,108 @@ export function BorrowPage({ onNavigate, initialItem, onClearInitialItem }: Borr
       <div className="print:hidden space-y-6">
         
         {/* Header Banner */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-          <div>
-            <div className="flex items-center gap-2 text-indigo-600 mb-1">
-              <ArrowLeftRight size={22} className="shrink-0" />
-              <span className="text-xs font-bold uppercase tracking-wider">Hospital Loan & Borrowing Register</span>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 bg-gradient-to-r from-violet-500/10 via-purple-500/5 to-pink-500/10 p-6 rounded-3xl border border-violet-100/80 shadow-xs relative overflow-hidden">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-violet-200">
+              <ArrowLeftRight size={22} />
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight">
-              ระบบยืม-คืนของและเครื่องมือวอร์ด
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              บันทึกประวัติการยืมเครื่องมือแพทย์ เวชภัณฑ์ และอุปกรณ์ต่างแผนก ติดตามกำหนดส่งคืน และออกใบยืม-คืน
-            </p>
+            <div>
+              <div className="inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-xs font-black text-indigo-700 border border-indigo-200/60 shadow-2xs mb-2">
+                <Sparkles size={13} className="text-pink-500" />
+                <span>Hospital Loan &amp; Borrowing Register 🌸</span>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight">
+                ระบบยืม-คืนของและเครื่องมือวอร์ด 🤝
+              </h1>
+              <p className="text-sm text-slate-500 mt-1">
+                บันทึกประวัติการยืมเครื่องมือแพทย์ เวชภัณฑ์ และอุปกรณ์ต่างแผนก ติดตามกำหนดส่งคืน และออกใบยืม-คืน 💖
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm transition-all shadow-md shadow-indigo-200 active:scale-95 cursor-pointer"
+              className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-2xl font-black text-sm transition-all shadow-md shadow-indigo-200 active:scale-95 cursor-pointer"
             >
               <Plus size={18} strokeWidth={2.5} />
-              <span>บันทึกการยืมของใหม่</span>
+              <span>บันทึกการยืมของใหม่ ➕</span>
             </button>
           </div>
         </div>
 
-        {/* Quick Stats Badges */}
+        {/* Quick Stats Badges with Cute Dual-Layer Icons */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div 
             onClick={() => setStatusFilter('ALL')}
-            className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-              statusFilter === 'ALL' ? 'bg-indigo-50 border-indigo-200 shadow-xs' : 'bg-white border-slate-100 hover:border-slate-200 shadow-2xs'
+            className={`p-4 rounded-3xl border transition-all cursor-pointer ${
+              statusFilter === 'ALL' 
+                ? 'bg-gradient-to-br from-indigo-50 to-violet-50/60 border-indigo-200 shadow-xs' 
+                : 'bg-white border-slate-100 hover:border-slate-200 shadow-2xs'
             }`}
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-500 uppercase">บันทึกทั้งหมด</span>
-              <FileText size={16} className="text-slate-400" />
+              <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center text-sm shadow-2xs">
+                📑
+              </div>
             </div>
             <p className="text-2xl font-black text-slate-800 mt-2">{stats.total}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">รายการประวัติยืมทั้งหมด</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">รายการประวัติยืมทั้งหมด ✨</p>
           </div>
 
           <div 
             onClick={() => setStatusFilter('BORROWED')}
-            className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-              statusFilter === 'BORROWED' ? 'bg-amber-50 border-amber-200 shadow-xs' : 'bg-white border-slate-100 hover:border-slate-200 shadow-2xs'
+            className={`p-4 rounded-3xl border transition-all cursor-pointer ${
+              statusFilter === 'BORROWED' 
+                ? 'bg-gradient-to-br from-amber-50 to-orange-50/60 border-amber-200 shadow-xs' 
+                : 'bg-white border-slate-100 hover:border-slate-200 shadow-2xs'
             }`}
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-amber-700 uppercase">กำลังยืม (ยังไม่คืน)</span>
-              <Clock size={16} className="text-amber-500" />
+              <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-sm shadow-2xs">
+                ⏳
+              </div>
             </div>
             <p className="text-2xl font-black text-amber-700 mt-2">{stats.borrowed}</p>
-            <p className="text-[11px] text-amber-600 mt-0.5">อยู่ในความดูแลของผู้ยืม</p>
+            <p className="text-[11px] text-amber-600 mt-0.5">อยู่ในความดูแลของผู้ยืม 📦</p>
           </div>
 
           <div 
             onClick={() => setStatusFilter('OVERDUE')}
-            className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-              statusFilter === 'OVERDUE' ? 'bg-rose-50 border-rose-200 shadow-xs' : 'bg-white border-slate-100 hover:border-slate-200 shadow-2xs'
+            className={`p-4 rounded-3xl border transition-all cursor-pointer ${
+              statusFilter === 'OVERDUE' 
+                ? 'bg-gradient-to-br from-rose-50 to-pink-50/60 border-rose-200 shadow-xs' 
+                : 'bg-white border-slate-100 hover:border-slate-200 shadow-2xs'
             }`}
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-rose-700 uppercase">เกินกำหนดคืน</span>
-              <AlertTriangle size={16} className="text-rose-500" />
+              <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center text-sm shadow-2xs animate-bounce">
+                🚨
+              </div>
             </div>
             <p className="text-2xl font-black text-rose-700 mt-2">{stats.overdue}</p>
-            <p className="text-[11px] text-rose-600 mt-0.5">ต้องติดต่อทวงถามด่วน</p>
+            <p className="text-[11px] text-rose-600 mt-0.5">ต้องติดต่อทวงถามด่วน ⚠️</p>
           </div>
 
           <div 
             onClick={() => setStatusFilter('RETURNED')}
-            className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-              statusFilter === 'RETURNED' ? 'bg-emerald-50 border-emerald-200 shadow-xs' : 'bg-white border-slate-100 hover:border-slate-200 shadow-2xs'
+            className={`p-4 rounded-3xl border transition-all cursor-pointer ${
+              statusFilter === 'RETURNED' 
+                ? 'bg-gradient-to-br from-emerald-50 to-teal-50/60 border-emerald-200 shadow-xs' 
+                : 'bg-white border-slate-100 hover:border-slate-200 shadow-2xs'
             }`}
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-emerald-700 uppercase">คืนแล้วเสร็จ</span>
-              <CheckCircle2 size={16} className="text-emerald-500" />
+              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm shadow-2xs">
+                ✅
+              </div>
             </div>
             <p className="text-2xl font-black text-emerald-700 mt-2">{stats.returned}</p>
-            <p className="text-[11px] text-emerald-600 mt-0.5">ส่งคืนคลังเรียบร้อย</p>
+            <p className="text-[11px] text-emerald-600 mt-0.5">ส่งคืนคลังเรียบร้อย 💖</p>
           </div>
         </div>
 

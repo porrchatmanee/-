@@ -1,13 +1,84 @@
-@import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Mitr:wght@300;400;500;600&family=Prompt:wght@300;400;500;600;700;800&family=Kanit:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Prompt", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Prompt", "Mitr", "Kanit", ui-sans-serif, system-ui, sans-serif;
+  --font-cute: "Mitr", "Fredoka", "Prompt", sans-serif;
 }
 
+:root {
+  --app-font-scale: 1;
+}
+
+html[data-font-size="normal"] {
+  --app-font-scale: 1;
+  font-size: 16px;
+}
+
+html[data-font-size="large"] {
+  --app-font-scale: 1.15;
+  font-size: 18px;
+}
+
+html[data-font-size="xlarge"] {
+  --app-font-scale: 1.3;
+  font-size: 20px;
+}
+
+/* Cute typography & smooth rendering */
 body {
   font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f8fafc;
+  color: #1e293b;
+}
+
+/* Modern pastel glow & subtle gradients */
+.bg-mesh-cute {
+  background-color: #faf5ff;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(224, 231, 255, 0.6) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(254, 226, 226, 0.4) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(243, 232, 255, 0.5) 0px, transparent 50%);
+}
+
+.cute-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 4px 20px -2px rgba(99, 102, 241, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cute-card:hover {
+  box-shadow: 0 10px 25px -3px rgba(99, 102, 241, 0.12), 0 4px 10px -2px rgba(0, 0, 0, 0.04);
+  transform: translateY(-2px);
+}
+
+.cute-button-bouncy {
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.cute-button-bouncy:active {
+  transform: scale(0.95);
+}
+
+/* Custom cute scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 /* Hide scrollbar for category tabs */
@@ -15,6 +86,14 @@ body {
   display: none;
 }
 .hide-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Print Landscape for reports and wide tables */
+@media print {
+  @page {
+    size: landscape;
+    margin: 10mm;
+  }
 }
