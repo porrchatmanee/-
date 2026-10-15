@@ -7,21 +7,28 @@ import {
   ArrowRight, PackageOpen, AlertCircle, Search, Package, 
   Tag, Clock, Layers, CheckCircle2, AlertTriangle, X, 
   HelpCircle, Sparkles, Filter, ChevronRight, Edit, SlidersHorizontal, Target, Save,
-  FileText, Printer
+  FileText, Printer, ArrowLeftRight, Lock, Unlock, Eye, EyeOff
 } from 'lucide-react';
+import { HideToSecretModal } from '../components/HideToSecretModal';
 
 interface DashboardProps {
-  onNavigate: (view: string) => void;
+  onNavigate: (view: string, itemData?: any) => void;
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const { items, transactions, updateItem } = useInventory();
+  const { items, transactions, updateItem, borrowRecords, isSecretUnlocked } = useInventory();
   
   // Search & Filter state for the All Items Stock Table
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [stockFilter, setStockFilter] = useState<'all' | 'low' | 'over' | 'out' | 'hasExpiry'>('all');
   
+  // Secret Stock & Hide Item Modal State
+  const [isHideModalOpen, setIsHideModalOpen] = useState(false);
+  const [selectedHideItem, setSelectedHideItem] = useState<InventoryItem | null>(null);
+  const [showHiddenItems, setShowHiddenItems] = useState(false);
+  const hiddenItemsCount = React.useMemo(() => items.filter(i => i.isHidden).length, [items]);
+
   // Lot inspection modal state
   const [inspectLotItem, setInspectLotItem] = useState<InventoryItem | null>(null);
 
@@ -57,9 +64,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     setEditMinMaxItem(null);
   };
 
-  // Summary per category
+  // Summary per category (based on visible items)
+  const visibleItems = React.useMemo(() => {
+    if (showHiddenItems) return items;
+    return items.filter(i => !i.isHidden);
+  }, [items, showHiddenItems]);
+
   const summary = CATEGORIES.map(cat => {
-    const catItems = items.filter(i => i.categoryId === cat.id);
+    const catItems = visibleItems.filter(i => i.categoryId === cat.id);
     const totalQty = catItems.reduce((acc, curr) => acc + curr.quantity, 0);
     const lowStockCount = catItems.filter(i => i.quantity > 0 && i.quantity <= (i.minStock ?? 10)).length;
     const overStockCount = catItems.filter(i => i.quantity > (i.maxStock ?? 100)).length;
@@ -67,37 +79,46 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     return { ...cat, totalQty, lowStockCount, overStockCount, outOfStockCount, count: catItems.length };
   });
 
-  const totalAllItems = items.length;
-  const totalAllUnits = items.reduce((acc, curr) => acc + curr.quantity, 0);
-  const totalLowStock = items.filter(i => i.quantity > 0 && i.quantity <= (i.minStock ?? 10)).length;
-  const totalOverStock = items.filter(i => i.quantity > (i.maxStock ?? 100)).length;
-  const totalOutOfStock = items.filter(i => i.quantity === 0).length;
+  const totalAllItems = visibleItems.length;
+  const totalAllUnits = visibleItems.reduce((acc, curr) => acc + curr.quantity, 0);
+  const totalLowStock = visibleItems.filter(i => i.quantity > 0 && i.quantity <= (i.minStock ?? 10)).length;
+  const totalOverStock = visibleItems.filter(i => i.quantity > (i.maxStock ?? 100)).length;
+  const totalOutOfStock = visibleItems.filter(i => i.quantity === 0).length;
 
   // 1. Group items using the centralized utility
-  const groupedItems = React.useMemo(() => groupInventoryItems(items), [items]);
+  const groupedItems = React.useMemo(() => groupInventoryItems(visibleItems), [visibleItems]);
 
-  // 2. Filter the grouped items list based on search and filters
-  const filteredItems = groupedItems.filter(item => {
-    const matchesSearch = 
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.groupBarcodes.some(id => id.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (item.lots && item.lots.some(l => l.lotNumber.toLowerCase().includes(searchTerm.toLowerCase())));
+  // 2. Filter and sort grouped items list based on search and filters (Hidden items sorted to bottom)
+  const filteredItems = React.useMemo(() => {
+    return groupedItems
+      .filter(item => {
+        const matchesSearch = 
+          item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.groupBarcodes.some(id => id.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (item.lots && item.lots.some(l => l.lotNumber.toLowerCase().includes(searchTerm.toLowerCase())));
 
-    const matchesCategory = selectedCategory === 'all' || item.categoryId === selectedCategory;
+        const matchesCategory = selectedCategory === 'all' || item.categoryId === selectedCategory;
 
-    let matchesStock = true;
-    if (stockFilter === 'low') {
-      matchesStock = item.quantity > 0 && item.quantity <= (item.minStock ?? 10);
-    } else if (stockFilter === 'over') {
-      matchesStock = item.quantity > (item.maxStock ?? 100);
-    } else if (stockFilter === 'out') {
-      matchesStock = item.quantity === 0;
-    } else if (stockFilter === 'hasExpiry') {
-      matchesStock = !!item.expiryDate;
-    }
+        let matchesStock = true;
+        if (stockFilter === 'low') {
+          matchesStock = item.quantity > 0 && item.quantity <= (item.minStock ?? 10);
+        } else if (stockFilter === 'over') {
+          matchesStock = item.quantity > (item.maxStock ?? 100);
+        } else if (stockFilter === 'out') {
+          matchesStock = item.quantity === 0;
+        } else if (stockFilter === 'hasExpiry') {
+          matchesStock = !!item.expiryDate;
+        }
 
-    return matchesSearch && matchesCategory && matchesStock;
-  });
+        return matchesSearch && matchesCategory && matchesStock;
+      })
+      .sort((a, b) => {
+        // Keep hidden/secret items down at the very bottom
+        if (a.isHidden && !b.isHidden) return 1;
+        if (!a.isHidden && b.isHidden) return -1;
+        return 0;
+      });
+  }, [groupedItems, searchTerm, selectedCategory, stockFilter]);
 
   const recentTransactions = transactions.slice(0, 5);
 
@@ -168,6 +189,41 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           )}
         </div>
       </header>
+
+      {/* ----------------- BORROW SYSTEM QUICK WIDGET ----------------- */}
+      <section>
+        <div 
+          onClick={() => onNavigate('borrow')}
+          className="bg-gradient-to-br from-indigo-50/70 to-white p-5 rounded-3xl border border-indigo-150/70 shadow-xs hover:shadow-md transition-all cursor-pointer group flex items-center justify-between gap-4"
+        >
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-200 group-hover:scale-105 transition-transform">
+              <ArrowLeftRight size={22} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-base text-slate-800 tracking-tight group-hover:text-indigo-600 transition-colors">
+                  ระบบยืม-คืนของ &amp; เครื่องมือ
+                </h3>
+                {((borrowRecords || []).filter(r => r.status !== 'RETURNED').length > 0) && (
+                  <span className="text-[10px] font-black bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                    กำลังยืม {(borrowRecords || []).filter(r => r.status !== 'RETURNED').length} รายการ
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5 truncate">
+                บันทึกผู้ยืม แผนก กำหนดส่งคืน และออกใบยืม-คืนอุปกรณ์ (เลือกจากคลังสินค้าทั้งหมดที่มี)
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs font-bold text-indigo-600 hidden sm:inline">เปิดระบบยืม-คืน</span>
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 group-hover:translate-x-1 transition-transform">
+              <ArrowRight size={16} />
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* ----------------- MULTI-LOT & EXPIRY GUIDE CARD ----------------- */}
       <section className="bg-gradient-to-br from-indigo-50/80 via-white to-rose-50/50 border border-indigo-100 rounded-3xl p-5 md:p-6 shadow-xs">
@@ -358,6 +414,21 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             >
               📅 มีวันหมดอายุ ({items.filter(i => i.expiryDate).length})
             </button>
+
+            {hiddenItemsCount > 0 && (
+              <button
+                onClick={() => setShowHiddenItems(!showHiddenItems)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                  showHiddenItems 
+                    ? 'bg-rose-50 text-rose-700 border-rose-200 shadow-xs ring-2 ring-rose-200/50' 
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+                title={showHiddenItems ? "กำลังแสดงไอเทมที่ซ่อนไว้ คลิกเพื่อซ่อนกลับ" : "คลิกเพื่อดูไอเทมที่ถูกซ่อนไว้"}
+              >
+                {showHiddenItems ? <Eye size={13} className="text-rose-600" /> : <EyeOff size={13} className="text-slate-400" />}
+                <span>{showHiddenItems ? 'ซ่อนของลับ' : 'ดูของที่ซ่อนไว้'} ({hiddenItemsCount})</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -445,6 +516,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                                 +{(item as any).groupBarcodes.length - 1} รหัสอื่นในกลุ่ม
                               </span>
                             )}
+                            {item.isHidden && (
+                              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded-md whitespace-nowrap inline-flex items-center gap-1">
+                                <Lock size={10} />
+                                <span>ซ่อนอยู่ (คลังลับ)</span>
+                              </span>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -520,6 +597,30 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                       {/* Action */}
                       <td className="py-4 px-3 text-center pr-4 whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedHideItem(item);
+                              setIsHideModalOpen(true);
+                            }}
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
+                              item.isHidden 
+                                ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' 
+                                : 'bg-slate-100 hover:bg-amber-50 text-slate-500 hover:text-amber-700'
+                            }`}
+                            title={item.isHidden ? "ไอเทมนี้ถูกซ่อนอยู่ (คลิกเพื่อแก้ไขหรือย้ายเข้า Stock ลับ)" : "ซ่อนไอเทม / ย้ายเข้า Stock ลับสำหรับวันหยุดยาว"}
+                          >
+                            {item.isHidden ? <EyeOff size={14} /> : <Lock size={13} />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onNavigate('borrow', item)}
+                            className="text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2 py-1.5 rounded-xl transition-colors cursor-pointer inline-flex items-center gap-1 border border-indigo-200/80"
+                            title="ยืมอุปกรณ์/สินค้านี้"
+                          >
+                            <ArrowLeftRight size={13} />
+                            <span>ยืม</span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => openDashboardMinMaxModal(item)}
@@ -606,6 +707,41 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <p>ยังไม่มีความเคลื่อนไหวใดๆ</p>
             </div>
           )}
+        </div>
+      </section>
+
+      {/* ----------------- 4. SECRET STOCK VAULT (MOVED TO VERY BOTTOM) ----------------- */}
+      <section className="pt-2">
+        <div 
+          onClick={() => onNavigate('secret_stock')}
+          className="bg-gradient-to-br from-rose-50/50 via-white to-slate-50 p-5 rounded-3xl border border-rose-200/80 shadow-xs hover:shadow-md transition-all cursor-pointer group flex items-center justify-between gap-4"
+        >
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-rose-200 group-hover:scale-105 transition-transform">
+              {isSecretUnlocked ? <Unlock size={22} /> : <Lock size={22} />}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-base text-slate-800 tracking-tight group-hover:text-rose-600 transition-colors">
+                  Stock ลับ (คลังสำรองลับเฉพาะวอร์ด)
+                </h3>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                  isSecretUnlocked ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200/80 text-slate-600'
+                }`}>
+                  {isSecretUnlocked ? '🔓 ปลดล็อกอยู่' : '🔒 ล็อก (PIN)'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5 truncate">
+                คลังสำรองยาฉุกเฉินและเวชภัณฑ์ลับเฉพาะวอร์ด สำหรับวันหยุดยาวและเหตุวิกฤต ป้องกันการเบิกสุ่มสี่สุ่มห้า
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs font-bold text-rose-600 hidden sm:inline">เข้าสู่คลังลับ</span>
+            <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 group-hover:translate-x-1 transition-transform">
+              <ArrowRight size={16} />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -848,6 +984,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </div>
         </div>
       )}
+
+      {/* Hide / Move to Secret Stock Modal */}
+      <HideToSecretModal
+        isOpen={isHideModalOpen}
+        onClose={() => {
+          setIsHideModalOpen(false);
+          setSelectedHideItem(null);
+        }}
+        item={selectedHideItem}
+        onNavigateToSecret={() => onNavigate('secret_stock')}
+      />
 
     </div>
   );

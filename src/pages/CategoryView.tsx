@@ -6,13 +6,20 @@ import { generateLotNumber, groupInventoryItems } from '../lib/lots';
 import { 
   Search, Plus, LayoutGrid, Package, ArrowLeftRight, FileText, 
   ArrowDownLeft, ArrowUpRight, AlertTriangle, Clock, Target, 
-  Layers, CircleDollarSign, Calendar, Info, X, Check, CheckCircle2, Save, Camera, RefreshCcw, Trash2, Edit, Scan, Zap, Sparkles, Tag, SlidersHorizontal
+  Layers, CircleDollarSign, Calendar, Info, X, Check, CheckCircle2, Save, Camera, RefreshCcw, Trash2, Edit, Scan, Zap, Sparkles, Tag, SlidersHorizontal, Lock, Eye, EyeOff
 } from 'lucide-react';
 import { InventoryItem } from '../types';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { UnitSelector } from '../components/UnitSelector';
+import { HideToSecretModal } from '../components/HideToSecretModal';
 
-export function CategoryView({ categoryId }: { categoryId: string }) {
+export function CategoryView({ 
+  categoryId, 
+  onNavigate 
+}: { 
+  categoryId: string; 
+  onNavigate?: (view: string, itemData?: any) => void; 
+}) {
   const { items, transactions, addItem, processTransaction, deleteItem, updateItem } = useInventory();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
@@ -25,6 +32,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
   const [adjustQty, setAdjustQty] = useState(1);
   const [adjustExpiry, setAdjustExpiry] = useState('');
   const [adjustLot, setAdjustLot] = useState('');
+  const [adjustPrice, setAdjustPrice] = useState<number | ''>('');
   const [isManualIssue, setIsManualIssue] = useState<boolean>(false);
   const [viewLotsItem, setViewLotsItem] = useState<InventoryItem | null>(null);
 
@@ -37,17 +45,29 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
   const [directEditName, setDirectEditName] = useState('');
   const [directEditQty, setDirectEditQty] = useState(0);
   const [directEditUnit, setDirectEditUnit] = useState('กล่อง');
+  const [directEditPrice, setDirectEditPrice] = useState<number | ''>('');
   const [directEditMinStock, setDirectEditMinStock] = useState<number>(10);
   const [directEditMaxStock, setDirectEditMaxStock] = useState<number>(100);
 
+  // Quick Price Modal
+  const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
+  const [priceEditItem, setPriceEditItem] = useState<InventoryItem | null>(null);
+  const [tempPrice, setTempPrice] = useState<number | ''>('');
+
   // Mode for viewing items: 'grouped' (combine same-named items) vs 'all' (raw barcodes)
   const [itemViewMode, setItemViewMode] = useState<'grouped' | 'all'>('grouped');
+
+  // Hidden Items & Secret Stock Modals
+  const [isHideModalOpen, setIsHideModalOpen] = useState(false);
+  const [selectedHideItem, setSelectedHideItem] = useState<InventoryItem | null>(null);
+  const [showHiddenItems, setShowHiddenItems] = useState(false);
 
   // New Item Form
   const [newId, setNewId] = useState('');
   const [newName, setNewName] = useState('');
   const [newQty, setNewQty] = useState(0);
   const [newUnit, setNewUnit] = useState('กล่อง');
+  const [newPrice, setNewPrice] = useState<number | ''>('');
   const [newExpiry, setNewExpiry] = useState('');
   const [newLot, setNewLot] = useState('');
   const [newMinStock, setNewMinStock] = useState<number>(10);
@@ -707,28 +727,59 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
   // Filter items in this category
   const categoryItems = useMemo(() => items.filter(i => i.categoryId === categoryId), [items, categoryId]);
 
+  // Count of hidden items in this category
+  const hiddenItemsCount = useMemo(() => categoryItems.filter(i => i.isHidden).length, [categoryItems]);
+
+  // Visible items based on showHiddenItems toggle
+  const visibleCategoryItems = useMemo(() => {
+    if (showHiddenItems) return categoryItems;
+    return categoryItems.filter(i => !i.isHidden);
+  }, [categoryItems, showHiddenItems]);
+
   // Unified / Grouped Category Items by Normalized Name
   const groupedCategoryItems = useMemo(() => {
-    return groupInventoryItems(categoryItems);
-  }, [categoryItems]);
+    return groupInventoryItems(visibleCategoryItems);
+  }, [visibleCategoryItems]);
 
-  // Filter items in this category based on mode
+  // Filter and sort items in this category based on mode (Hidden items sorted to bottom)
   const filteredItems = useMemo(() => {
-    const source = itemViewMode === 'grouped' ? groupedCategoryItems : categoryItems;
-    return source.filter(i => 
-      i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      i.id.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [itemViewMode, groupedCategoryItems, categoryItems, searchTerm]);
+    const source = itemViewMode === 'grouped' ? groupedCategoryItems : visibleCategoryItems;
+    return source
+      .filter(i => 
+        i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        i.id.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .sort((a, b) => {
+        // Keep hidden/secret items down at the very bottom
+        if (a.isHidden && !b.isHidden) return 1;
+        if (!a.isHidden && b.isHidden) return -1;
+        return 0;
+      });
+  }, [itemViewMode, groupedCategoryItems, visibleCategoryItems, searchTerm]);
 
-  // Helper to estimate price/value for items
-  const getItemPrice = (id: string) => {
-    if (id === 'M001') return 20;
-    if (id === 'M002') return 85; 
-    if (id === 'M003') return 120;
-    if (id === 'M004') return 55;
-    return 50; // Fallback price
+  // Helper to get real price/value for items
+  const getItemPrice = (idOrItem: string | InventoryItem): number => {
+    if (typeof idOrItem === 'object' && idOrItem) {
+      if (idOrItem.price !== undefined && idOrItem.price > 0) return idOrItem.price;
+      if (idOrItem.lots && idOrItem.lots.length > 0) {
+        const lotWithPrice = idOrItem.lots.find(l => l.pricePerUnit !== undefined && l.pricePerUnit > 0);
+        if (lotWithPrice && lotWithPrice.pricePerUnit) return lotWithPrice.pricePerUnit;
+      }
+      return 0;
+    }
+    const found = items.find(i => i.id === idOrItem);
+    if (found?.price !== undefined && found.price > 0) return found.price;
+    if (found?.lots && found.lots.length > 0) {
+      const lotWithPrice = found.lots.find(l => l.pricePerUnit !== undefined && l.pricePerUnit > 0);
+      if (lotWithPrice && lotWithPrice.pricePerUnit) return lotWithPrice.pricePerUnit;
+    }
+    return 0;
   };
+
+  // Total value in this category
+  const totalCategoryStockValue = useMemo(() => {
+    return categoryItems.reduce((acc, curr) => acc + (curr.quantity * (curr.price || 0)), 0);
+  }, [categoryItems]);
 
   // 1. Calculations for upper summary cards (Based on grouped unique products)
   const totalItems = groupedCategoryItems.length;
@@ -806,10 +857,8 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
 
   const handleAddNewItem = (e: React.FormEvent) => {
     e.preventDefault();
-    // Normalize barcode strictly: if user left Thai in box, convert automatically
     let cleanId = (isAddNumericOnly ? extractBarcodeDigits(newId) : normalizeBarcode(newId)) || newId.replace(/\s+/g, '').toUpperCase();
     
-    // Auto-generate code if item has no barcode
     if (!cleanId) {
       const prefix = (categoryId ? categoryId.substring(0, 3) : 'SKU').toUpperCase();
       cleanId = `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -820,11 +869,9 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
       return;
     }
 
-    // Check if item already exists (by intelligent barcode matching)
     const existing = items.find(i => areBarcodesMatching(cleanId, i.id));
 
     if (existing) {
-      // AUTOMATIC MERGE: Receive stock into existing item and record transaction & lot
       if (newQty > 0) {
         processTransaction({
           itemId: existing.id,
@@ -832,17 +879,20 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
           quantity: newQty,
           expiryDate: newExpiry || undefined,
           lotNumber: newLot.trim() || undefined,
+          pricePerUnit: newPrice !== '' ? Number(newPrice) : undefined,
           operator: 'พยาบาล'
         });
       }
 
-      // Sync name or min/max if updated
       const updates: Partial<InventoryItem> = {};
       if (newName.trim() && newName.trim() !== existing.name) {
         updates.name = newName.trim();
       }
       if (newUnit && newUnit !== existing.unit) {
         updates.unit = newUnit;
+      }
+      if (newPrice !== '' && Number(newPrice) > 0) {
+        updates.price = Number(newPrice);
       }
       if (Number(newMinStock) !== undefined && Number(newMinStock) !== existing.minStock) {
         updates.minStock = Number(newMinStock);
@@ -854,11 +904,11 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
         updateItem(existing.id, updates);
       }
 
-      // Reset Form
       setNewId('');
       setNewName('');
       setNewQty(0);
       setNewUnit('กล่อง');
+      setNewPrice('');
       setNewExpiry('');
       setNewLot('');
       setNewMinStock(10);
@@ -871,7 +921,8 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
     const initialLots = newQty > 0 ? [{
       lotNumber: newLot.trim() || generateLotNumber(newExpiry),
       expiryDate: newExpiry || '',
-      quantity: newQty
+      quantity: newQty,
+      pricePerUnit: newPrice !== '' ? Number(newPrice) : undefined
     }] : [];
 
     addItem({
@@ -880,17 +931,18 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
       categoryId: categoryId as any,
       quantity: newQty,
       unit: newUnit,
+      price: newPrice !== '' ? Number(newPrice) : undefined,
       expiryDate: newExpiry || undefined,
       minStock: Number(newMinStock) || 10,
       maxStock: Number(newMaxStock) || 100,
       lots: initialLots
     });
 
-    // Reset Form
     setNewId('');
     setNewName('');
     setNewQty(0);
     setNewUnit('กล่อง');
+    setNewPrice('');
     setNewExpiry('');
     setNewLot('');
     setNewMinStock(10);
@@ -909,6 +961,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
       quantity: adjustQty,
       expiryDate: adjustExpiry || adjustItem.expiryDate || undefined,
       lotNumber: adjustLot.trim() || undefined,
+      pricePerUnit: adjustType === 'RECEIVE' && adjustPrice !== '' ? Number(adjustPrice) : undefined,
     });
 
     setIsAdjustModalOpen(false);
@@ -916,6 +969,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
     setAdjustQty(1);
     setAdjustExpiry('');
     setAdjustLot('');
+    setAdjustPrice('');
     setIsManualIssue(false);
   };
 
@@ -925,6 +979,7 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
     setDirectEditName(item.name);
     setDirectEditQty(item.quantity);
     setDirectEditUnit(item.unit);
+    setDirectEditPrice(item.price ?? '');
     setDirectEditMinStock(item.minStock ?? 10);
     setDirectEditMaxStock(item.maxStock ?? 100);
     setDirectBarcodeError('');
@@ -946,12 +1001,14 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
       name: directEditName.trim() || directEditItem.name,
       quantity: directEditQty,
       unit: directEditUnit,
+      price: directEditPrice !== '' ? Number(directEditPrice) : directEditItem.price,
       minStock: Number(directEditMinStock) || 10,
       maxStock: Number(directEditMaxStock) || 100,
     });
     
     setIsDirectEditModalOpen(false);
     setDirectEditItem(null);
+    setDirectEditPrice('');
     setDirectBarcodeError('');
   };
 
@@ -1440,29 +1497,48 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
               />
             </div>
 
-            <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-2xl shrink-0 self-start md:self-auto">
-              <button
-                type="button"
-                onClick={() => setItemViewMode('grouped')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  itemViewMode === 'grouped'
-                    ? 'bg-white text-slate-800 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                📦 รวมสินค้าบาร์โค้ด & ชื่อเดียวกัน ({groupedCategoryItems.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setItemViewMode('all')}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  itemViewMode === 'all'
-                    ? 'bg-white text-slate-800 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                🏷️ แยกดูทุกแถวข้อมูล ({categoryItems.length})
-              </button>
+            <div className="flex flex-wrap items-center gap-2 shrink-0 self-start md:self-auto">
+              {/* Show Hidden Items Toggle Button */}
+              {hiddenItemsCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowHiddenItems(!showHiddenItems)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                    showHiddenItems 
+                      ? 'bg-rose-50 text-rose-700 border-rose-200 shadow-xs ring-2 ring-rose-200/50' 
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
+                  title={showHiddenItems ? "กำลังแสดงไอเทมที่ซ่อนไว้ คลิกเพื่อซ่อนกลับ" : "คลิกเพื่อดูไอเทมที่ถูกซ่อนไว้"}
+                >
+                  {showHiddenItems ? <Eye size={14} className="text-rose-600" /> : <EyeOff size={14} className="text-slate-400" />}
+                  <span>{showHiddenItems ? 'ซ่อนของลับ' : 'ดูของที่ซ่อนไว้'} ({hiddenItemsCount})</span>
+                </button>
+              )}
+
+              <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => setItemViewMode('grouped')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    itemViewMode === 'grouped'
+                      ? 'bg-white text-slate-800 shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  📦 รวมสินค้าบาร์โค้ด & ชื่อเดียวกัน ({groupedCategoryItems.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setItemViewMode('all')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    itemViewMode === 'all'
+                      ? 'bg-white text-slate-800 shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  🏷️ แยกดูทุกแถวข้อมูล ({visibleCategoryItems.length})
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1502,6 +1578,12 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                               {item.lots && item.lots.length > 1 && (
                                 <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-1.5 py-0.5 rounded-md whitespace-nowrap">
                                   {item.lots.length} ล็อต
+                                </span>
+                              )}
+                              {item.isHidden && (
+                                <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200/80 px-1.5 py-0.5 rounded-md whitespace-nowrap inline-flex items-center gap-1">
+                                  <Lock size={10} />
+                                  <span>ซ่อนอยู่ (คลังลับ)</span>
                                 </span>
                               )}
                             </div>
@@ -1583,7 +1665,28 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                             >
                               <ArrowUpRight size={16} />
                             </button>
+                            <button 
+                              onClick={() => onNavigate?.('borrow', item)}
+                              className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center hover:bg-indigo-100 transition-all border border-indigo-200 active:scale-95 cursor-pointer" 
+                              title="ยืมอุปกรณ์/สินค้านี้"
+                            >
+                              <ArrowLeftRight size={15} />
+                            </button>
                             <div className="w-px h-6 bg-slate-200 mx-1"></div>
+                            <button 
+                              onClick={() => {
+                                setSelectedHideItem(item);
+                                setIsHideModalOpen(true);
+                              }}
+                              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all border active:scale-95 cursor-pointer ${
+                                item.isHidden 
+                                  ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100' 
+                                  : 'bg-slate-50 text-slate-500 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200'
+                              }`}
+                              title={item.isHidden ? "ไอเทมนี้ถูกซ่อนอยู่ (คลิกเพื่อแก้ไขหรือย้ายเข้า Stock ลับ)" : "ซ่อนไอเทม / ย้ายเข้า Stock ลับสำหรับวันหยุดยาว"}
+                            >
+                              {item.isHidden ? <EyeOff size={15} /> : <Lock size={15} />}
+                            </button>
                             <button 
                               onClick={() => openEditModal(item)}
                               className="w-9 h-9 rounded-xl bg-slate-50 text-slate-500 flex items-center justify-center hover:bg-slate-100 hover:text-indigo-600 transition-all border border-slate-100 active:scale-95 cursor-pointer" 
@@ -2137,6 +2240,23 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                     />
                   </div>
 
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-550 block">ราคาต่อหน่วย (บาท / ราคาทุนรอบนี้)</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="เช่น 150.00 (เว้นว่างได้)"
+                        value={newPrice}
+                        onChange={(e) => setNewPrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                        onFocus={(e) => e.target.select()}
+                        className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl text-slate-800 font-black focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+                      />
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">บาท</span>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-slate-550 block">หมายเลขล็อต (Lot / Batch No.)</label>
@@ -2306,6 +2426,23 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                       onChange={(e) => setAdjustLot(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl font-mono text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-700"
                     />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-550 block">ราคาต่อหน่วยในรอบนี้ (Price per Unit)</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="ระบุราคาต่อหน่วยของรอบนี้..."
+                        value={adjustPrice}
+                        onChange={(e) => setAdjustPrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                        onFocus={(e) => e.target.select()}
+                        className="w-full bg-emerald-50/50 border border-emerald-200 px-4 py-2.5 rounded-xl text-slate-800 font-black text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      />
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-bold">บาท</span>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">
@@ -2707,6 +2844,24 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
                       className="w-full bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-200"
                     />
                   </div>
+
+                  {/* Price per unit edit */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-600 block">ราคาต่อหน่วยล่าสุด (บาท)</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="เช่น 150.00"
+                        value={directEditPrice}
+                        onChange={(e) => setDirectEditPrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                        onFocus={(e) => e.target.select()}
+                        className="w-full bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl text-slate-800 font-black text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                      />
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">บาท</span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Column 2: Quantity, Unit, Min-Max & Gauge */}
@@ -2884,6 +3039,16 @@ export function CategoryView({ categoryId }: { categoryId: string }) {
           </div>
         </div>
       )}
+
+      {/* -------------------- MODAL: HIDE TO SECRET STOCK -------------------- */}
+      <HideToSecretModal
+        isOpen={isHideModalOpen}
+        onClose={() => {
+          setIsHideModalOpen(false);
+          setSelectedHideItem(null);
+        }}
+        item={selectedHideItem}
+      />
 
     </div>
   );

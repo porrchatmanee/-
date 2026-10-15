@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { AppState, InventoryItem, Transaction, ItemLot } from '../types';
-import { INITIAL_ITEMS } from './constants';
+import { AppState, InventoryItem, Transaction, ItemLot, BorrowRecord, SecretStockItem, SecretStockLog } from '../types';
+import { INITIAL_ITEMS, SAMPLE_BORROW_RECORDS, SAMPLE_SECRET_ITEMS, SAMPLE_SECRET_LOGS, DEFAULT_SECRET_PIN } from './constants';
 import { supabase, isSupabaseConfigured, getMaskedUrl, getMaskedKey } from './supabase';
 import { computeItemLots, getEarliestLotExpiry, formatOperatorWithLot, parseLotFromOperator, generateLotNumber } from './lots';
 
@@ -17,6 +17,27 @@ interface InventoryContextType extends AppState {
   fetchData: () => Promise<void>;
   getMaskedUrl: () => string;
   getMaskedKey: () => string;
+
+  // Borrow & Loan System (ระบบยืม-คืนของ)
+  borrowRecords: BorrowRecord[];
+  addBorrowRecord: (record: Omit<BorrowRecord, 'id' | 'status'> & { id?: string; status?: 'BORROWED' | 'RETURNED' | 'OVERDUE' }) => Promise<void>;
+  returnBorrowRecord: (id: string, returnData: { actualReturnDate?: string; returnCondition?: 'NORMAL' | 'DAMAGED' | 'LOST'; returnReceiver?: string; notes?: string }) => Promise<void>;
+  deleteBorrowRecord: (id: string) => Promise<void>;
+  updateBorrowRecord: (id: string, updates: Partial<BorrowRecord>) => Promise<void>;
+
+  // Secret Stock System (ระบบ Stock ลับ)
+  secretItems: SecretStockItem[];
+  secretLogs: SecretStockLog[];
+  isSecretUnlocked: boolean;
+  unlockSecret: (pin: string) => boolean;
+  lockSecret: () => void;
+  changeSecretPin: (oldPin: string, newPin: string) => boolean;
+  addSecretItem: (item: SecretStockItem) => Promise<void>;
+  updateSecretItem: (id: string, updates: Partial<SecretStockItem>) => Promise<void>;
+  deleteSecretItem: (id: string) => Promise<void>;
+  adjustSecretStock: (itemId: string, type: 'IN' | 'OUT' | 'TRANSFER_FROM_MAIN' | 'TRANSFER_TO_MAIN', quantity: number, operator: string, notes?: string) => Promise<void>;
+  toggleItemHidden: (id: string) => Promise<void>;
+  hideItemToSecretStock: (itemId: string, quantityToMove: number, secretLocation?: string, holidayEmergencyNote?: string) => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -113,6 +134,56 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('sukjai_inventory_state_v2', JSON.stringify(state));
   }, [state]);
 
+  // Borrow & Loan Records State
+  const [borrowRecords, setBorrowRecords] = useState<BorrowRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('sukjai_borrow_records_v1');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return SAMPLE_BORROW_RECORDS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sukjai_borrow_records_v1', JSON.stringify(borrowRecords));
+  }, [borrowRecords]);
+
+  // Secret Stock State
+  const [secretItems, setSecretItems] = useState<SecretStockItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('sukjai_secret_items_v1');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return SAMPLE_SECRET_ITEMS;
+  });
+
+  const [secretLogs, setSecretLogs] = useState<SecretStockLog[]>(() => {
+    try {
+      const saved = localStorage.getItem('sukjai_secret_logs_v1');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return SAMPLE_SECRET_LOGS;
+  });
+
+  const [secretPin, setSecretPin] = useState<string>(() => {
+    return localStorage.getItem('sukjai_secret_pin_v1') || DEFAULT_SECRET_PIN;
+  });
+
+  const [isSecretUnlocked, setIsSecretUnlocked] = useState<boolean>(false);
+
+  useEffect(() => {
+    localStorage.setItem('sukjai_secret_items_v1', JSON.stringify(secretItems));
+  }, [secretItems]);
+
+  useEffect(() => {
+    localStorage.setItem('sukjai_secret_logs_v1', JSON.stringify(secretLogs));
+  }, [secretLogs]);
+
   const clearDbError = () => setDbError(null);
 
   const fetchData = async () => {
@@ -205,6 +276,8 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       id: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       timestamp: now,
       lotNumber: effectiveLot,
+      pricePerUnit: txArgs.pricePerUnit,
+      totalPrice: txArgs.pricePerUnit ? txArgs.pricePerUnit * txArgs.quantity : undefined,
       operator: txArgs.operator || 'พยาบาล'
     };
 
@@ -249,6 +322,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
           const tempItem: InventoryItem = {
             ...currentItem,
             quantity: newQuantity,
+            price: (txArgs.pricePerUnit !== undefined && txArgs.pricePerUnit > 0) ? txArgs.pricePerUnit : currentItem.price,
           };
           const lots = computeItemLots(tempItem, updatedTxs);
           const earliestExp = getEarliestLotExpiry(lots);
@@ -265,6 +339,7 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
             categoryId: 'medical',
             quantity: txArgs.quantity,
             unit: 'ชิ้น',
+            price: txArgs.pricePerUnit,
             expiryDate: txArgs.expiryDate
           };
           const lots = computeItemLots(newItem, updatedTxs);
@@ -628,6 +703,244 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // -------------------------------------------------------------
+  // Borrow & Loan Actions (ระบบยืม-คืนของ)
+  // -------------------------------------------------------------
+  const addBorrowRecord = async (record: Omit<BorrowRecord, 'id' | 'status'> & { id?: string; status?: 'BORROWED' | 'RETURNED' | 'OVERDUE' }) => {
+    const today = new Date().toISOString().split('T')[0];
+    const isOverdue = record.expectedReturnDate && record.expectedReturnDate < today;
+    const initialStatus = record.status || (isOverdue ? 'OVERDUE' : 'BORROWED');
+    const newId = record.id || `BRW-${Date.now().toString().slice(-6)}`;
+
+    const newRecord: BorrowRecord = {
+      ...record,
+      id: newId,
+      status: initialStatus,
+    };
+
+    setBorrowRecords(prev => [newRecord, ...prev]);
+
+    // If deductFromStock is requested and item exists in inventory
+    if (record.deductFromStock && record.itemId) {
+      const existing = state.items.find(i => i.id === record.itemId);
+      if (existing) {
+        await processTransaction({
+          itemId: record.itemId,
+          type: 'ISSUE',
+          quantity: record.quantity,
+          operator: `[ยืมของ] ${record.borrowerName} (${record.borrowerDepartment})`,
+        });
+      }
+    }
+  };
+
+  const returnBorrowRecord = async (id: string, returnData: { actualReturnDate?: string; returnCondition?: 'NORMAL' | 'DAMAGED' | 'LOST'; returnReceiver?: string; notes?: string }) => {
+    const target = borrowRecords.find(b => b.id === id);
+    if (!target) return;
+
+    const returnTimestamp = returnData.actualReturnDate || new Date().toISOString();
+
+    setBorrowRecords(prev => prev.map(rec => {
+      if (rec.id !== id) return rec;
+      return {
+        ...rec,
+        status: 'RETURNED',
+        actualReturnDate: returnTimestamp,
+        returnCondition: returnData.returnCondition || 'NORMAL',
+        returnReceiver: returnData.returnReceiver || 'เจ้าหน้าที่',
+        notes: returnData.notes !== undefined ? returnData.notes : rec.notes,
+      };
+    }));
+
+    // If item was deducted from stock, and was returned (not LOST), add it back to inventory
+    if (target.deductFromStock && target.itemId && returnData.returnCondition !== 'LOST') {
+      const existing = state.items.find(i => i.id === target.itemId);
+      if (existing) {
+        await processTransaction({
+          itemId: target.itemId,
+          type: 'RECEIVE',
+          quantity: target.quantity,
+          operator: `[รับคืนของ] จาก ${target.borrowerName} (${target.borrowerDepartment}) โดย ${returnData.returnReceiver || 'เจ้าหน้าที่'}`,
+        });
+      }
+    }
+  };
+
+  const deleteBorrowRecord = async (id: string) => {
+    setBorrowRecords(prev => prev.filter(r => r.id !== id));
+  };
+
+  const updateBorrowRecord = async (id: string, updates: Partial<BorrowRecord>) => {
+    setBorrowRecords(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+  };
+
+  // -------------------------------------------------------------
+  // Secret Stock Actions (ระบบ Stock ลับ)
+  // -------------------------------------------------------------
+  const unlockSecret = (pin: string): boolean => {
+    if (pin.trim() === secretPin.trim()) {
+      setIsSecretUnlocked(true);
+      return true;
+    }
+    return false;
+  };
+
+  const lockSecret = () => {
+    setIsSecretUnlocked(false);
+  };
+
+  const changeSecretPin = (oldPin: string, newPin: string): boolean => {
+    if (oldPin.trim() === secretPin.trim() && newPin.trim().length >= 4) {
+      setSecretPin(newPin.trim());
+      localStorage.setItem('sukjai_secret_pin_v1', newPin.trim());
+      return true;
+    }
+    return false;
+  };
+
+  const addSecretItem = async (item: SecretStockItem) => {
+    const cleanId = item.id.trim().toUpperCase();
+    setSecretItems(prev => {
+      const existingIndex = prev.findIndex(i => i.id.trim().toUpperCase() === cleanId);
+      if (existingIndex >= 0) {
+        const copy = [...prev];
+        copy[existingIndex] = {
+          ...copy[existingIndex],
+          quantity: copy[existingIndex].quantity + item.quantity,
+          location: item.location || copy[existingIndex].location,
+          notes: item.notes || copy[existingIndex].notes,
+          updatedAt: new Date().toISOString(),
+        };
+        return copy;
+      }
+      return [item, ...prev];
+    });
+
+    const newLog: SecretStockLog = {
+      id: `SLOG-${Date.now().toString().slice(-6)}`,
+      itemId: item.id,
+      itemName: item.name,
+      type: 'IN',
+      quantity: item.quantity,
+      operator: 'เจ้าหน้าที่คลังลับ',
+      timestamp: new Date().toISOString(),
+      notes: `เพิ่มรายการในคลังลับ (จุดซ่อน: ${item.location || '-'})`,
+    };
+    setSecretLogs(prev => [newLog, ...prev]);
+  };
+
+  const updateSecretItem = async (id: string, updates: Partial<SecretStockItem>) => {
+    setSecretItems(prev => prev.map(item => {
+      if (item.id === id) {
+        return { ...item, ...updates, updatedAt: new Date().toISOString() };
+      }
+      return item;
+    }));
+  };
+
+  const deleteSecretItem = async (id: string) => {
+    setSecretItems(prev => prev.filter(i => i.id !== id));
+  };
+
+  const adjustSecretStock = async (itemId: string, type: 'IN' | 'OUT' | 'TRANSFER_FROM_MAIN' | 'TRANSFER_TO_MAIN', quantity: number, operator: string, notes?: string) => {
+    const item = secretItems.find(i => i.id === itemId);
+    if (!item) return;
+
+    if (type === 'IN') {
+      setSecretItems(prev => prev.map(i => i.id === itemId ? { ...i, quantity: i.quantity + quantity, updatedAt: new Date().toISOString() } : i));
+    } else if (type === 'OUT') {
+      setSecretItems(prev => prev.map(i => i.id === itemId ? { ...i, quantity: Math.max(0, i.quantity - quantity), updatedAt: new Date().toISOString() } : i));
+    } else if (type === 'TRANSFER_FROM_MAIN') {
+      const mainItem = state.items.find(i => i.id === itemId || normalizeItemName(i.name) === normalizeItemName(item.name));
+      if (mainItem) {
+        await processTransaction({
+          itemId: mainItem.id,
+          type: 'ISSUE',
+          quantity: quantity,
+          operator: `[โอนเข้าสต็อกลับ] โดย ${operator}`,
+        });
+      }
+      setSecretItems(prev => prev.map(i => i.id === itemId ? { ...i, quantity: i.quantity + quantity, updatedAt: new Date().toISOString() } : i));
+    } else if (type === 'TRANSFER_TO_MAIN') {
+      const mainItem = state.items.find(i => i.id === itemId || normalizeItemName(i.name) === normalizeItemName(item.name));
+      if (mainItem) {
+        await processTransaction({
+          itemId: mainItem.id,
+          type: 'RECEIVE',
+          quantity: quantity,
+          operator: `[โอนออกจากสต็อกลับสู่คลังหลัก] โดย ${operator}`,
+        });
+      }
+      setSecretItems(prev => prev.map(i => i.id === itemId ? { ...i, quantity: Math.max(0, i.quantity - quantity), updatedAt: new Date().toISOString() } : i));
+    }
+
+    const log: SecretStockLog = {
+      id: `SLOG-${Date.now().toString().slice(-6)}`,
+      itemId,
+      itemName: item.name,
+      type,
+      quantity,
+      operator: operator || 'เจ้าหน้าที่คลังลับ',
+      timestamp: new Date().toISOString(),
+      notes: notes || '',
+    };
+    setSecretLogs(prev => [log, ...prev]);
+  };
+
+  const toggleItemHidden = async (id: string) => {
+    setState(prev => ({
+      ...prev,
+      items: prev.items.map(item => item.id === id ? { ...item, isHidden: !item.isHidden } : item),
+      lastUpdated: new Date().toISOString()
+    }));
+  };
+
+  const hideItemToSecretStock = async (
+    itemId: string,
+    quantityToMove: number,
+    secretLocation?: string,
+    holidayEmergencyNote?: string
+  ) => {
+    const mainItem = state.items.find(i => i.id === itemId);
+    if (!mainItem) return;
+
+    const moveQty = Math.min(mainItem.quantity, Math.max(1, quantityToMove));
+    
+    // 1. Deduct from main inventory
+    await processTransaction({
+      itemId: mainItem.id,
+      type: 'ISSUE',
+      quantity: moveQty,
+      operator: `[ซ่อนเข้าสต็อกลับวันหยุดยาว] ${holidayEmergencyNote || 'สำรองฉุกเฉิน'}`,
+    });
+
+    // 2. Add or increment in secretItems
+    const secretId = `SEC-${mainItem.id}`;
+    const existingSecret = secretItems.find(s => s.id === secretId || normalizeItemName(s.name) === normalizeItemName(mainItem.name));
+
+    if (existingSecret) {
+      await updateSecretItem(existingSecret.id, {
+        quantity: existingSecret.quantity + moveQty,
+        location: secretLocation || existingSecret.location || 'ตู้ลับสำรองฉุกเฉินวันหยุดยาว',
+        notes: holidayEmergencyNote || existingSecret.notes || 'สำรองช่วงวันหยุดยาว/เทศกาล ป้องกันของขาด',
+        category: 'HOLIDAY_EMERGENCY'
+      });
+    } else {
+      await addSecretItem({
+        id: secretId,
+        name: `${mainItem.name} (สำรองฉุกเฉิน)`,
+        quantity: moveQty,
+        unit: mainItem.unit,
+        location: secretLocation || 'ตู้ลับสำรองฉุกเฉินวันหยุดยาว',
+        expiryDate: mainItem.expiryDate,
+        minStock: 2,
+        notes: holidayEmergencyNote || 'ซ่อนสำรองช่วงวันหยุดยาว/เทศกาล ป้องกันของขาด',
+        updatedAt: new Date().toISOString(),
+        category: 'HOLIDAY_EMERGENCY'
+      });
+    }
+  };
+
   return (
     <InventoryContext.Provider value={{
       ...state,
@@ -642,7 +955,28 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
       isOnline: isSupabaseConfigured,
       fetchData,
       getMaskedUrl,
-      getMaskedKey
+      getMaskedKey,
+
+      // Borrow records
+      borrowRecords,
+      addBorrowRecord,
+      returnBorrowRecord,
+      deleteBorrowRecord,
+      updateBorrowRecord,
+
+      // Secret stock
+      secretItems,
+      secretLogs,
+      isSecretUnlocked,
+      unlockSecret,
+      lockSecret,
+      changeSecretPin,
+      addSecretItem,
+      updateSecretItem,
+      deleteSecretItem,
+      adjustSecretStock,
+      toggleItemHidden,
+      hideItemToSecretStock,
     }}>
       {children}
     </InventoryContext.Provider>

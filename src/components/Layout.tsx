@@ -5,6 +5,8 @@ import { Dashboard } from '../pages/Dashboard';
 import { CategoryView } from '../pages/CategoryView';
 import { SettingsPage } from '../pages/SettingsPage';
 import { ReportsPage } from '../pages/ReportsPage';
+import { BorrowPage } from '../pages/BorrowPage';
+import { SecretStockPage } from '../pages/SecretStockPage';
 import { InventoryProvider, useInventory } from '../lib/store';
 import { Menu, X, AlertCircle, RefreshCcw } from 'lucide-react';
 import { normalizeBarcode } from '../lib/barcode';
@@ -19,9 +21,15 @@ export function LayoutContent() {
 
   const { dbError, clearDbError, isOnline } = useInventory();
 
-  const handleNavigate = (view: string) => {
+  // State for pre-selected item when navigating to Borrow page
+  const [initialBorrowItem, setInitialBorrowItem] = useState<any>(null);
+
+  const handleNavigate = (view: string, itemData?: any) => {
     setCurrentView(view);
     setIsMobileMenuOpen(false);
+    if (view === 'borrow' && itemData) {
+      setInitialBorrowItem(itemData);
+    }
   };
 
   // Global Physical Barcode Scanner Interceptor (Keyboard Wedge)
@@ -176,9 +184,20 @@ export function LayoutContent() {
 
         <main className="flex-1 overflow-y-auto pt-16 md:pt-0 w-full relative print:p-0 print:overflow-visible">
           {currentView === 'dashboard' && <Dashboard onNavigate={handleNavigate} />}
+          {currentView === 'borrow' && (
+            <BorrowPage 
+              onNavigate={handleNavigate} 
+              initialItem={initialBorrowItem}
+              onClearInitialItem={() => setInitialBorrowItem(null)}
+            />
+          )}
+          {currentView === 'secret_stock' && <SecretStockPage onNavigate={handleNavigate} />}
           {currentView === 'reports' && <ReportsPage />}
           {currentView.startsWith('category_') && (
-            <CategoryView categoryId={currentView.replace('category_', '')} />
+            <CategoryView 
+              categoryId={currentView.replace('category_', '')} 
+              onNavigate={handleNavigate}
+            />
           )}
           {currentView === 'settings' && <SettingsPage />}
         </main>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, ScanLine, LayoutDashboard, Settings, Layers, RotateCcw, FileText, Printer } from 'lucide-react';
+import { Package, ScanLine, LayoutDashboard, Settings, Layers, RotateCcw, FileText, Printer, ArrowLeftRight, Lock, Unlock } from 'lucide-react';
 import { CATEGORIES } from '../lib/constants';
 import { useInventory } from '../lib/store';
 
@@ -10,7 +10,9 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentView, onNavigate, onOpenScanner }: SidebarProps) {
-  const { isOnline, isSyncing } = useInventory();
+  const { isOnline, isSyncing, borrowRecords, isSecretUnlocked } = useInventory();
+
+  const activeBorrowedCount = (borrowRecords || []).filter(r => r.status !== 'RETURNED').length;
 
   return (
     <div className="w-64 bg-white border-r border-slate-100 flex flex-col h-full shadow-sm">
@@ -43,12 +45,31 @@ export function Sidebar({ currentView, onNavigate, onOpenScanner }: SidebarProps
           onClick={() => onNavigate('dashboard')}
           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors ${
             currentView === 'dashboard'
-              ? 'bg-slate-100 text-slate-800'
+              ? 'bg-slate-100 text-slate-800 font-bold'
               : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
           }`}
         >
           <LayoutDashboard size={18} />
           <span>ภาพรวม (Dashboard)</span>
+        </button>
+
+        <button
+          onClick={() => onNavigate('borrow')}
+          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium transition-colors ${
+            currentView === 'borrow'
+              ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-100'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <ArrowLeftRight size={18} className={currentView === 'borrow' ? 'text-indigo-600' : ''} />
+            <span>ระบบยืม-คืนของ</span>
+          </div>
+          {activeBorrowedCount > 0 && (
+            <span className="text-[10px] font-black bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+              {activeBorrowedCount}
+            </span>
+          )}
         </button>
 
         <button
@@ -96,6 +117,36 @@ export function Sidebar({ currentView, onNavigate, onOpenScanner }: SidebarProps
           <Settings size={18} />
           <span>ตั้งค่าระบบ</span>
         </button>
+
+        {/* Secret Stock (Moved down to the very bottom) */}
+        <div className="pt-4 mt-6 border-t border-slate-100">
+          <div className="px-3 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            คลังลับเฉพาะ (Secret Vault)
+          </div>
+          <button
+            onClick={() => onNavigate('secret_stock')}
+            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium transition-colors ${
+              currentView === 'secret_stock'
+                ? 'bg-rose-50 text-rose-700 font-bold border border-rose-100'
+                : 'text-slate-400 hover:bg-rose-50/50 hover:text-rose-600'
+            }`}
+            title="คลังสำรองลับเฉพาะวอร์ด ป้องกันการเบิกสุ่มสี่สุ่มห้า"
+          >
+            <div className="flex items-center gap-3">
+              {isSecretUnlocked ? (
+                <Unlock size={17} className="text-rose-500" />
+              ) : (
+                <Lock size={17} className="text-slate-400" />
+              )}
+              <span className="text-xs font-bold">Stock ลับ (คลังลับ)</span>
+            </div>
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+              isSecretUnlocked ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-400'
+            }`}>
+              {isSecretUnlocked ? '🔓 เปิด' : '🔒 ล็อก'}
+            </span>
+          </button>
+        </div>
       </nav>
       
       <div className="p-4 border-t border-slate-100">

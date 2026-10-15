@@ -75,12 +75,16 @@ export function computeItemLots(item: InventoryItem, allTransactions: Transactio
       const existingLot = lotsPool.find(l => l.lotNumber === lotNum && l.expiryDate === expDate);
       if (existingLot) {
         existingLot.quantity += tx.quantity;
+        if (tx.pricePerUnit !== undefined && tx.pricePerUnit > 0) {
+          existingLot.pricePerUnit = tx.pricePerUnit;
+        }
       } else {
         lotsPool.push({
           lotNumber: lotNum,
           expiryDate: expDate,
           quantity: tx.quantity,
-          receivedDate: tx.timestamp
+          receivedDate: tx.timestamp,
+          pricePerUnit: tx.pricePerUnit !== undefined ? tx.pricePerUnit : item.price
         });
       }
     } else if (tx.type === 'ISSUE' || tx.type === 'DISPENSE') {
@@ -241,6 +245,11 @@ export function groupInventoryItems(items: InventoryItem[]): (InventoryItem & { 
       // Inherit min/max thresholds - use the ones from the item that has them set (non-default)
       if (item.minStock !== undefined && item.minStock !== 10) existing.minStock = item.minStock;
       if (item.maxStock !== undefined && item.maxStock !== 100) existing.maxStock = item.maxStock;
+      
+      // Inherit price
+      if (item.price !== undefined && item.price > 0 && (!existing.price || existing.price === 0)) {
+        existing.price = item.price;
+      }
     } else {
       const primaryKey = cleanBarcode || normalizedName || item.id;
       groups.push({
